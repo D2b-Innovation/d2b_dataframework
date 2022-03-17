@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='example',
+    name='d2b_data',
     version='0.1.0',
-    packages=find_packages(include=['exampleproject', 'exampleproject.*'])
+    packages=find_packages(include=['d2b_data', 'd2b_data.*'])
 )
