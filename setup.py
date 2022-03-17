@@ -7,8 +7,9 @@ setup(
     install_requires=[
         'httplib2',
         'pandas',
-        'google-api-python-client',
         'oauth2client',
+        'google-api-python-client',
+        'google-analytics-data',
         'google-cloud',
         'google-cloud-core',
         'google-cloud-bigquery',

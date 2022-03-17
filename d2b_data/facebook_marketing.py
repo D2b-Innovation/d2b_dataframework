@@ -10,7 +10,7 @@ import math
 
 
 
-class d2b_facebook():
+class facebook_marketing():
   def __init__(self, app_id,app_secret ,access_token,debug=False,unsampled=False,debug_level=0):
     '''
     args
