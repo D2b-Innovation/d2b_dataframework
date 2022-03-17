@@ -8,7 +8,8 @@ setuptools.setup(
     version="0.0.1",
     author="Paulo Kemen Plaza",
     author_email="paulo.plaza.ibarra@gmail.com",
-    description="Company frameword",
+    description="Company framework",
+    package_data={'pykemen': ['d2b_dataframework/*.py', '*']},
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://gitlab.com/analytics67/d2b_dataframework.git",
@@ -23,4 +24,14 @@ setuptools.setup(
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
     python_requires=">=3.6",
+    install_requires=[
+        'httplib2',
+        'pandas',
+        'google-api-python-client',
+        'oauth2client',
+        'google-cloud',
+        'google-cloud-core',
+        'google-cloud-bigquery',
+        'future'
+    ]
 )
