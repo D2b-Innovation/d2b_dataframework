@@ -9,7 +9,7 @@ import pandas as pd
 import os
 
 
-class GA4():
+class google_ga4():
   def __init__(self,client_secret,token_pickle, debug=False, unsampled=False,intraday_limit=30):
     self.client_secret = client_secret
     self.credentials   = self._get_token(self.client_secret,token_pickle)
