@@ -4,14 +4,15 @@ from google.analytics.data_v1beta.types import Dimension
 from google.analytics.data_v1beta.types import Metric
 from google.analytics.data_v1beta.types import RunReportRequest
 from google_auth_oauthlib import flow
+import pickle
 import pandas as pd
 import os
 
 
-class google_ga4():
-  def __init__(self,client_secret=None, debug=False, unsampled=False,intraday_limit=30):
+class GA4():
+  def __init__(self,client_secret=None,token_pickle=None, debug=False, unsampled=False,intraday_limit=30):
     self.client_secret = client_secret
-    self.credentials   = self.get_token(self.client_secret)
+    self.credentials   = self._get_token(self.client_secret,token_pickle)
     self.client        = self._create_client(self.credentials)
     self.debug_status  = debug
     self.unsampled     = unsampled
@@ -58,32 +59,36 @@ class google_ga4():
     client = BetaAnalyticsDataClient(credentials=credentials)
     return client
 
-  def get_token(self,client_secret=True,launch_browser=True):
+  def _get_token(self,client_secret,token_pickle):
     '''
     To create the token and connect to the service
     ARGS
-    client_secret <str>     path to the file where is located the client_secret
-    lauch_browser <boolean> option to change the flow with console o local_server
+    client_secret <str>  path to the file where is located the client_secret
+    token_pickle  <str>  path to the token pickle where the session will be stored
     RETURN
     <obj> Credentials
     '''
-    print()
-    if client_secret==True or self.client_secret is None:
-      raise Exception("Path to client_secret not provided")
-    #we create the following case to change the client secret when is not provided by the default path
-    #if type(a) == bool and client_secret:
-    #  client_secret = self.client_secret
-    launch_browser = False
-    appflow = flow.InstalledAppFlow.from_client_secrets_file(
-        client_secret,
-        scopes=['https://www.googleapis.com/auth/analytics.readonly']
-    )
-    if launch_browser:
-        appflow.run_local_server()
-    else:
-        appflow.run_console()
-    creds = appflow.credentials
-    self.credentials = creds
+    SCOPES =  ['https://www.googleapis.com/auth/analytics.readonly']
+    creds = None
+
+    try:
+        if os.path.exists(token_pickle):
+            with open(token_pickle, 'rb') as token:
+                creds = pickle.load(token)
+
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flows = flow.InstalledAppFlow.from_client_secrets_file(credentials, SCOPES)
+                creds = flows.run_console()
+            with open(token_pickle, 'wb') as token:
+                pickle.dump(creds, token)
+
+        return creds
+    except Exception as e:
+        print(e)
+        return False
     return creds
 
   def _to_DF(self,response):
@@ -161,6 +166,9 @@ class google_ga4():
     return response
 
   def get_report_dataframe(self,property_id=None,dimensions=None,metrics=None,start_date=None,end_date=None):
+    '''
+
+    '''
     if self.unsampled:
       array_df = []
       self.debug(f"get_report unsampled")
