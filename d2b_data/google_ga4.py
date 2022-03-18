@@ -10,7 +10,7 @@ import os
 
 
 class GA4():
-  def __init__(self,client_secret=None,token_pickle=None, debug=False, unsampled=False,intraday_limit=30):
+  def __init__(self,client_secret,token_pickle, debug=False, unsampled=False,intraday_limit=30):
     self.client_secret = client_secret
     self.credentials   = self._get_token(self.client_secret,token_pickle)
     self.client        = self._create_client(self.credentials)
@@ -80,7 +80,7 @@ class GA4():
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                flows = flow.InstalledAppFlow.from_client_secrets_file(credentials, SCOPES)
+                flows = flow.InstalledAppFlow.from_client_secrets_file(client_secret, SCOPES)
                 creds = flows.run_console()
             with open(token_pickle, 'wb') as token:
                 pickle.dump(creds, token)
