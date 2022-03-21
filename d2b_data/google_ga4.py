@@ -75,15 +75,13 @@ class google_ga4():
         if os.path.exists(token_pickle):
             with open(token_pickle, 'rb') as token:
                 creds = pickle.load(token)
-
+            return creds
         if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                flows = flow.InstalledAppFlow.from_client_secrets_file(client_secret, SCOPES)
-                creds = flows.run_console()
+            flows = flow.InstalledAppFlow.from_client_secrets_file(client_secret, SCOPES)
+            creds = flows.run_console()
             with open(token_pickle, 'wb') as token:
                 pickle.dump(creds, token)
+                
 
         return creds
     except Exception as e:
