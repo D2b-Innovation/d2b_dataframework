@@ -81,8 +81,6 @@ class google_ga4():
             creds = flows.run_console()
             with open(token_pickle, 'wb') as token:
                 pickle.dump(creds, token)
-                
-
         return creds
     except Exception as e:
         print(e)
