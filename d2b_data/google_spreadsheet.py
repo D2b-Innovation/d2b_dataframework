@@ -16,10 +16,13 @@ class Spreadsheet:
     request = self.service.spreadsheets()
     return request
 
-  def read_data(self,spreadsheetId,range_name):
+  def read_data_dataframe(self,spreadsheetId,range_name):
     request = self.service.spreadsheets().values().get(spreadsheetId=spreadsheetId, range=range_name)
     response = request.execute()
-    return pd.DataFrame(response.get('values'))
+    df_response = pd.DataFrame(response.get('values'))
+    df_response.columns = df_response.iloc[0]
+    df_response = df_response.drop(df_response.index[0], inplace = True)
+    return df_response
 
   def delete_data(self,sheetid,spreadsheetId,vector,start_index,end_index):
     '''
