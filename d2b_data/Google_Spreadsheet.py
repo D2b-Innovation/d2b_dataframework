@@ -3,7 +3,7 @@ import pandas as pd
 from oauth2client import client
 import json
 
-class Spreadsheet:
+class Google_Spreadsheet:
   def __init__(self,url_id,token):
     self.token   = token
     self.url_id  = url_id

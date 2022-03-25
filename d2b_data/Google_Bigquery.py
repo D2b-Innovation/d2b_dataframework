@@ -2,7 +2,7 @@ import pandas
 from google.oauth2 import service_account
 
 
-class google_bigquery():
+class Google_Bigquery():
   def __init__(self,credentials_info=None,verbose=False):
       self.credentials_info = credentials_info
       if type(self.credentials_info) is not None:
