@@ -161,11 +161,11 @@ class Google_GA4():
       print(f"Warning Sampled Report {start_date} {end_date} with  {len(response.rows)}")
     return response
 
-  def get_report_dataframe(self,property_id=None,dimensions=None,metrics=None,start_date=None,end_date=None):
+  def get_report_dataframe(self,property_id=None,dimensions=None,metrics=None,start_date=None,end_date=None,unsampled=None):
     '''
 
     '''
-    if self.unsampled:
+    if self.unsampled or unsampled:
       array_df = []
       self.debug(f"get_report unsampled")
       for date in [date.strftime('%Y-%m-%d') for date  in pd.date_range(start_date,end_date)]:
