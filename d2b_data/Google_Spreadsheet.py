@@ -4,7 +4,7 @@ from oauth2client import client
 import json
 
 class Google_Spreadsheet:
-  def __init__(self,url_id,token):
+  def __init__(self,url_id=None,token):
     self.token   = token
     self.url_id  = url_id
     with open(token, 'r') as f:
@@ -21,7 +21,7 @@ class Google_Spreadsheet:
     response = request.execute()
     df_response = pd.DataFrame(response.get('values'))
     df_response.columns = df_response.iloc[0]
-    df_response = df_response.drop(df_response.index[0], inplace = True)
+    df_response.drop(df_response.index[0], inplace = True)
     return df_response
 
   def delete_data(self,sheetid,spreadsheetId,vector,start_index,end_index):
