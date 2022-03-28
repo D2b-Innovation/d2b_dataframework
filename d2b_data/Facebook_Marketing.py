@@ -135,9 +135,10 @@ class Facebook_Marketing():
         df_facebook = pd.DataFrame(report)
 
     #unest the action field comming from Facebook
-    for unique_action in self._unique_actions(df_facebook):
-      df_facebook["_action_"+unique_action] = df_facebook["actions"].apply(lambda x :self._split_text(x,unique_action))
-    df_facebook = df_facebook.drop(columns="actions")
+    if "actions" in df_facebook:
+        for unique_action in self._unique_actions(df_facebook):
+          df_facebook["_action_"+unique_action] = df_facebook["actions"].apply(lambda x :self._split_text(x,unique_action))
+        df_facebook = df_facebook.drop(columns="actions")
     return df_facebook
 
   def def_report_array_accounts(self,params,id_account):
@@ -159,7 +160,7 @@ class Facebook_Marketing():
     set unique actions presented in the DataFrame
     '''
     if "actions" not in df:
-        return
+        return []
     unique_actions = set()
     for all_actions in df["actions"].fillna(""):
       for single_action in all_actions:
