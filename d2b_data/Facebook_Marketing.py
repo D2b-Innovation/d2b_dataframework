@@ -158,6 +158,8 @@ class Facebook_Marketing():
     return
     set unique actions presented in the DataFrame
     '''
+    if "actions" in df:
+        return
     unique_actions = set()
     for all_actions in df["actions"].fillna(""):
       for single_action in all_actions:
