@@ -93,7 +93,7 @@ class Linkedin_Marketing():
     text
 
     url = f'https://api.linkedin.com/v2/adAnalyticsV2?q=statistics&{text}&timeGranularity={time}&{start}{end}&accounts={account_id}&fields={metrics}'
-    res = requests.get(url,headers=lk.HEADERS)
+    res = requests.get(url,headers=self.HEADERS)
     if res.status_code != 200:
       raise Exception(res.content)
     return res.content
