@@ -1,3 +1,7 @@
+import pandas as pd
+import json
+import requests
+from os.path import exists
 
 class Linkedin_Marketing():
   def __init__(self,APPLICATON_KEY,APPLICATON_SECRET,verbose=False,verbose_level=False):
