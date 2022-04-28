@@ -2,6 +2,7 @@ import pandas as pd
 import json
 import requests
 from os.path import exists
+from requests.structures import CaseInsensitiveDict
 
 class Linkedin_Marketing():
   def __init__(self,APPLICATON_KEY,APPLICATON_SECRET,verbose=False,verbose_level=False):
