@@ -3,6 +3,10 @@ import json
 import requests
 from os.path import exists
 
+
+APPLICATON_KEY    = '771o2l44gxkg0e'
+APPLICATON_SECRET = 'wLuLB6NdVdne9CCe'
+
 class Linkedin_Marketing():
   def __init__(self,APPLICATON_KEY,APPLICATON_SECRET,verbose=False,verbose_level=False):
     '''
