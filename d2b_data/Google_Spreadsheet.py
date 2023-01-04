@@ -4,7 +4,7 @@ from oauth2client import client
 import json
 
 class Google_Spreadsheet:
-  def __init__(self,url_id=None,token):
+  def __init__(self,token,url_id=None):
     self.token   = token
     self.url_id  = url_id
     with open(token, 'r') as f:
