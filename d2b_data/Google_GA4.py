@@ -4,6 +4,7 @@ import webbrowser
 import httplib2
 import os
 import datetime
+import Google_Token_MNG 
 
 from googleapiclient.discovery import build
 from oauth2client import client
@@ -66,7 +67,7 @@ class Google_GA4():
 
   def create_service(self,secrets, credentials):
       ""
-      token_mng = google_auth_mng(secrets,
+      token_mng = Google_Token_MNG(secrets,
                               credentials,
                               scopes = ['https://www.googleapis.com/auth/analytics.readonly'],  
                               api_version   = self.default_version ,
