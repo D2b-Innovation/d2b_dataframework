@@ -67,7 +67,7 @@ class Google_GA4():
 
   def create_service(self,secrets, credentials):
       ""
-      token_mng = Google_Token_MNG(secrets,
+      token_mng = d2b_data.Google_Token_MNG.Google_Token_MNG(secrets,
                               credentials,
                               scopes = ['https://www.googleapis.com/auth/analytics.readonly'],  
                               api_version   = self.default_version ,
