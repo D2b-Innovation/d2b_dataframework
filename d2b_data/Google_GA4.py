@@ -117,5 +117,4 @@ class Google_GA4():
   def get_report_df(self,property_id,query):
       res = self._get_report_raw(property_id,query)
       DF_report = self._to_DF(res)
-      display(DF_report)
       return DF_report
