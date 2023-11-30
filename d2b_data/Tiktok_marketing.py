@@ -50,38 +50,53 @@ class Tiktok():
   def get_token(self,code):
     '''
     '''
+    self._debug(f"get_token : Start with {code}")
     endpoint_url = f"{self.endpoint_base}/oauth2/access_token/"
     params = {
-      "auth_code" : self.auth_code,
+      "auth_code" : code,
       "secret"    : self.secret,
       "app_id"    : self.app_id
     } 
+    
     headers = {'Content-Type': 'application/json'}
+    self._debug(f"""get_token | start request | {endpoint_url} + {params}""")
+
     response = requests.post(url=endpoint_url, params=params ,headers= headers)
+    
     if json.loads(response.content).get("code") == 40002:
       msg =  json.loads(response.content)
       raise Exception(f"""Unable to get Token, response:
       {msg} """)
+    response_json = json.loads(response.content)
+    self._debug(f"""get_token | end request  | response {response_json}""")
+    token =  response_json.get("data",{}).get("access_token")
+    self.token = token
+    self._debug(f"""get_token | END | {self.token}""")
 
-    self._debug(response.content)
-    return response.content
+    return self.token 
   
-  def auth_flow(self,redirect_uri=None,force_reset = None):
+  def auth_flow(self,redirect_uri=None,force_reset = False,token_filename="tiktok.token"):
     '''
     '''
-    if self.token is not None:
-      print("Token is provided")
-      return True
+    self._debug(f"auth_flow | start")
 
-    if redirect_uri is None:
-      redirect_uri = self.redirect
+    if force_reset is False:
+      if self.token is not None:
+        print("Token is provided")
+        return True
+
+      if redirect_uri is None:
+        redirect_uri = self.redirect
 
     print("Access to the following adreess and get the code:")
     print(self.get_authorization_url(redirect_uri))
     code = input("insert code: ")
 
-
-    return True
+    
+    token = self.get_token(code)
+    self._export_token(token_filename,token)
+    self._debug(f"auth_flow: END with token = {token}")
+    return token
 
   def get_report(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="true",data_level = "AUCTION_AD"):
     '''
