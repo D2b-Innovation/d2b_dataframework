@@ -11,7 +11,7 @@ class Tiktok():
     self.token  = token
     self.redirect  = ""
     self.auth_code = None
-    self.debugEnabled= debug
+    self.debugEnabled= debugEnabled
 
   def _debug(self,msg):
     if self.debugEnabled:
