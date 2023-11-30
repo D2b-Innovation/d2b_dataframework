@@ -4,17 +4,17 @@ import urllib.parse
 import pandas as pd
 
 class Tiktok():
-  def __init__(self,app_id,secret, token =None, debug=False):
+  def __init__(self,app_id,secret, token =None, debugEnabled=False):
     self.endpoint_base = "https://business-api.tiktok.com/open_api/v1.2"
     self.app_id = app_id
     self.secret = secret
     self.token  = token
     self.redirect  = ""
     self.auth_code = None
-    self.debug     = debug
+    self.debugEnabled= debug
 
   def _debug(self,msg):
-    if self.debug:
+    if self.debugEnabled:
       print(msg)
 
   def get_authorization_url(self,redirect_uri=None):
@@ -63,7 +63,7 @@ class Tiktok():
       raise Exception(f"""Unable to get Token, response:
       {msg} """)
 
-    self.debug(response.content)
+    self._debug(response.content)
     return response.content
   
   def auth_flow(self,redirect_uri=None,force_reset = None):
@@ -101,7 +101,7 @@ class Tiktok():
 
     report_requests = requests.get( url =report_base_URL  ,headers=headers, params=query)
     json_report_requests = json.loads(report_requests.content)
-    self.debug(json_report_requests)
+    self._debug(json_report_requests)
 
     if json_report_requests.get("code")  == 40002:
       print("No Results")
