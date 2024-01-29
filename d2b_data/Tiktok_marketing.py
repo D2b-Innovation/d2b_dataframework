@@ -98,7 +98,7 @@ class Tiktok():
     self._debug(f"auth_flow: END with token = {token}")
     return token
 
-  def get_report(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="true",data_level = "AUCTION_AD"):
+  def get_report(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="true",data_level = "AUCTION_AD",start_date=None,end_date=None):
     '''
     '''
     report_base_URL= f'https://business-api.tiktok.com/open_api/v1.2/reports/integrated/get/'
@@ -108,8 +108,12 @@ class Tiktok():
       "lifetime"         : lifetime,
       "data_level"        : data_level,
       "dimensions"        : dimensions,
-      "metrcs"            : metrics}
+      "metrics"            : metrics}
 
+    if start_date is not None:
+        query["start_date"] = start_date
+    if end_date is not None:
+      query["end_date"] = end_date
 
     headers = {'Content-Type': 'application/json',
            'Access-Token' : self.token}
@@ -123,11 +127,14 @@ class Tiktok():
       raise Exception("an error occurred", "No data in request, if you want to skip this add skip=True", 42)
     return json_report_requests
 
-  def get_report_dataframe(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="true",data_level = "AUCTION_AD"):
+  def get_report_dataframe(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="true",data_level = "AUCTION_AD",start_date=None,end_date=None):
     '''
     '''
-    report_requests = self.get_report(advertiser_id, dimensions, metrics, report_type,lifetime,data_level)
+
+    
+    report_requests = self.get_report(advertiser_id, dimensions, metrics, report_type,lifetime,data_level,start_date,end_date)
     report_data = report_requests.get("data",None).get("list",None)
+    
 
     DF = pd.json_normalize(report_data)
     return  DF
