@@ -27,7 +27,7 @@ class Tiktok():
     #  raise Exception("redirect uri is required")
 
 
-    #if redirect_uri is None :
+
     #  redirect_uri = self.redirect_uri
     redirect_uri = urllib.parse.quote_plus(redirect_uri)
     authorization_url = f"https://business-api.tiktok.com/portal/auth?app_id={self.app_id}&state=your_custom_params&redirect_uri={redirect_uri}"
@@ -56,13 +56,13 @@ class Tiktok():
       "auth_code" : code,
       "secret"    : self.secret,
       "app_id"    : self.app_id
-    } 
-    
+    }
+
     headers = {'Content-Type': 'application/json'}
     self._debug(f"""get_token | start request | {endpoint_url} + {params}""")
 
     response = requests.post(url=endpoint_url, params=params ,headers= headers)
-    
+
     if json.loads(response.content).get("code") == 40002:
       msg =  json.loads(response.content)
       raise Exception(f"""Unable to get Token, response:
@@ -73,8 +73,8 @@ class Tiktok():
     self.token = token
     self._debug(f"""get_token | END | {self.token}""")
 
-    return self.token 
-  
+    return self.token
+
   def auth_flow(self,redirect_uri=None,force_reset = False,token_filename="tiktok.token"):
     '''
     '''
@@ -92,28 +92,34 @@ class Tiktok():
     print(self.get_authorization_url(redirect_uri))
     code = input("insert code: ")
 
-    
+
     token = self.get_token(code)
     self._export_token(token_filename,token)
     self._debug(f"auth_flow: END with token = {token}")
     return token
 
-  def get_report(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="true",data_level = "AUCTION_AD",start_date=None,end_date=None):
+  def get_report(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="false",data_level = "AUCTION_AD",start_date=False , end_date=False):
     '''
     '''
     report_base_URL= f'https://business-api.tiktok.com/open_api/v1.2/reports/integrated/get/'
     query = {
-      "advertiser_id"     : f'{advertiser_id}',
-      "report_type"       : report_type,
+      "advertiser_id"    : f'{advertiser_id}',
+      "report_type"      : report_type,
       "lifetime"         : lifetime,
-      "data_level"        : data_level,
-      "dimensions"        : dimensions,
-      "metrics"            : metrics}
+      "data_level"       : data_level,
+      "dimensions"       : dimensions,
+      "metrics"          : metrics,
+      "page_size" : 999
+      }
 
-    if start_date is not None:
-        query["start_date"] = start_date
-    if end_date is not None:
+    if start_date != False:
+      query["start_date"] = start_date
+
+    if end_date != False:
       query["end_date"] = end_date
+
+
+
 
     headers = {'Content-Type': 'application/json',
            'Access-Token' : self.token}
@@ -127,19 +133,26 @@ class Tiktok():
       raise Exception("an error occurred", "No data in request, if you want to skip this add skip=True", 42)
     return json_report_requests
 
-  def get_report_dataframe(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="true",data_level = "AUCTION_AD",start_date=None,end_date=None):
+  def get_report_dataframe(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="false",data_level = "AUCTION_AD", start_date=False, end_date=False):
     '''
     '''
 
-    
-    report_requests = self.get_report(advertiser_id, dimensions, metrics, report_type,lifetime,data_level,start_date,end_date)
-    report_data = report_requests.get("data",None).get("list",None)
-    
+    date_range = pd.date_range(start_date, end_date)
+    query_array = []
 
-    DF = pd.json_normalize(report_data)
+    for date_iter in date_range:
+      date_iter_str = date_iter.strftime("%Y-%m-%d")
+      report_requests = self.get_report(advertiser_id, dimensions, metrics, report_type,lifetime,data_level, start_date=date_iter_str, end_date=date_iter_str)
+      report_data = report_requests.get("data",None).get("list",None)
+
+      df_iter = pd.json_normalize(report_data)
+      query_array.append(df_iter)
+
+    DF = pd.concat(query_array)
+    
     return  DF
-    
-     
+
+
   def _export_token(self,filename, token=None):
       if token is None:
         token= self.token
@@ -151,4 +164,3 @@ class Tiktok():
       object = f.read()
       retun_string = self.set_token(object)
       return retun_string
-
