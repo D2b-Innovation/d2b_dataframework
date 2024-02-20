@@ -41,7 +41,7 @@ class Google_Spreadsheet:
         {
           "updateCells": {
             "range": {
-              "sheetId": 0
+              "sheetId": sheetid
             },
             "fields": "*"
           }
