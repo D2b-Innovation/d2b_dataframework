@@ -18,7 +18,7 @@ from twitter_ads.utils import split_list
 from twitter_ads.http import Request
 
 
-class Twitter_ads:
+class X_ads:
   def __init__(self,api_key,api_key_secret,access_token=None, access_token_secret=None , screen_name=None):
     ''' Method: __init__ (constructor)
     Description:
