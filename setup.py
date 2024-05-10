@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='d2b_data',
-    version='0.2.0',
+    version='0.2.2',
     packages=find_packages(include=['d2b_data', 'd2b_data.*']),
     install_requires=[
         'httplib2',
@@ -14,6 +14,8 @@ setup(
         'google-cloud-core',
         'google-cloud-bigquery',
         'facebook_business',
+        'future',
+        'twitter-ads',
         'future',
 
     ]
