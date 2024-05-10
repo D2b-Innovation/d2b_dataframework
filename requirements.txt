@@ -7,3 +7,5 @@ future==0.17.1
 google-cloud==0.34.0
 google-cloud-bigquery==1.17.0
 google-cloud-core==1.0.3
+twitter-ads==11.0.0
+
