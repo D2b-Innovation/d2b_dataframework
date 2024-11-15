@@ -7,8 +7,8 @@ import httplib2
 import webbrowser
 import os
 import json
-
-
+import time
+ 
 class Google_Token_MNG():
   '''
 
@@ -45,7 +45,9 @@ class Google_Token_MNG():
           auth_uri = flow.step1_get_authorize_url()
           print("Auth url: {}".format(auth_uri))
           webbrowser.open(auth_uri)
+          time.sleep(3)
           auth_code = input('Enter the auth code: ')
+          time.sleep(3)
           cre = flow.step2_exchange(auth_code)
           self.saveJson(credentials,cre.to_json())
       else:
