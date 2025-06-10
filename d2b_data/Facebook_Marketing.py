@@ -3,18 +3,17 @@ import math
 import pandas as pd
 from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
-from facebook_business.adobjects.adsinsights import AdsInsights
 
 class Facebook_Marketing:
-    def __init__(self, app_id, app_secret, access_token, unsampled=False, verbose_logger=None):
+    def __init__(self, app_id, app_secret, access_token, id_account=None, unsampled=False, debug=False, verbose_logger=None):
         self.app_id = app_id
         self.app_secret = app_secret
         self.access_token = access_token
         self.unsampled = unsampled
+        self.debug = debug
+        self.id_account = id_account  # opcional
         self.verbose = verbose_logger if verbose_logger else self._null_verbose()
-        self.cache_report = None
-        self.max_tries = 500
-        FacebookAdsApi.init(app_id, app_secret, access_token)
+        self.service = FacebookAdsApi.init(self.app_id, self.app_secret, self.access_token)
 
     def _null_verbose(self):
         class DummyVerbose:
@@ -22,88 +21,111 @@ class Facebook_Marketing:
             def critical(self, *args, **kwargs): pass
         return DummyVerbose()
 
-    def get_report(self, params, id_account):
-        try:
-            my_account = AdAccount(id_account)
-            async_job = my_account.get_insights(params=params, is_async=True)
-            self.verbose.log(f"[get_report] Descargando reporte para cuenta {id_account}")
-            tries = 0
-            while async_job.api_get().get('async_status', '') != 'Job Completed' and tries <= self.max_tries:
-                self.verbose.log(f"[get_report] Esperando reporte... intento {tries + 1}")
-                time.sleep(3)
-                tries += 1
+    def _debug(self, message):
+        if self.debug:
+            print(message)
+        self.verbose.log(message)
 
-            result_job = async_job.get_result()
-            return result_job
-        except Exception as e:
-            self.verbose.critical(f"[get_report] Error en la extracción del reporte: {str(e)}")
-            return []
-
-    def get_report_dataframe(self, params, id_account):
+    def get_report_dataframe(self, params, id_account=None):
+        id_account = id_account or self.id_account
         if isinstance(id_account, list):
-            return self._report_multiple_accounts(params, id_account)
+            return self.def_report_array_accounts(params, id_account)
 
         df_facebook = pd.DataFrame()
+        act_id = f"act_{id_account}"
 
         if self.unsampled:
-            self.verbose.log("[get_report_dataframe] Extrayendo datos no muestreados (unsampled)")
-            date_range = pd.date_range(start=params["date_start"], end=params["date_stop"])
+            self._debug("get_report_dataframe | Unsampled")
             unsampled_array = []
-
+            date_range = pd.date_range(start=params["time_range"]["since"], end=params["time_range"]["until"])
             for date in date_range:
                 str_date = date.strftime("%Y-%m-%d")
-                params["time_range"] = {"since": str_date, "until": str_date}
-                self.verbose.log(f"[get_report_dataframe] Día: {str_date}")
-                report = self.get_report(params, id_account)
-                if not report:
-                    self.verbose.log(f"[get_report_dataframe] Día {str_date} sin datos.")
-                    empty_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
-                    df_day = pd.DataFrame(columns=empty_cols)
+                self._debug(f'{str_date}')
+                params["time_range"] = {'since': str_date, 'until': str_date}
+                report = self.get_report(params, act_id)
+                self._debug(f"get_report_dataframe | Report size {len(report)}")
+                if len(report) > 999:
+                    self.verbose.critical("get_report_dataframe | Report may be sampled")
+
+                if len(report) == 0:
+                    default_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
+                    df_facebook = pd.DataFrame(columns=default_cols)
                 else:
-                    df_day = pd.DataFrame(report)
+                    df_facebook = pd.DataFrame(report)
 
-                unsampled_array.append(df_day)
-
-            df_facebook = pd.concat(unsampled_array, ignore_index=True)
+                unsampled_array.append(df_facebook)
+            df_facebook = pd.concat(unsampled_array)
 
         else:
-            report = self.get_report(params, id_account)
-            if not report:
-                empty_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
-                df_facebook = pd.DataFrame(columns=empty_cols)
+            report = self.get_report(params, act_id)
+            if len(report) == 0:
+                default_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
+                df_facebook = pd.DataFrame(columns=default_cols)
             else:
                 df_facebook = pd.DataFrame(report)
 
-        # Procesamiento de acciones si existen
-        if "actions" in df_facebook.columns:
-            for action in self._unique_actions(df_facebook):
-                df_facebook[f"_action_{action}"] = df_facebook["actions"].apply(lambda x: self._split_text(x, action))
-            df_facebook.drop(columns=["actions"], inplace=True)
+        # Procesar acciones
+        actions_dict = self._unique_actions(df_facebook)
+        for column, actions in actions_dict.items():
+            for action in actions:
+                df_facebook[f"_action_{action}"] = df_facebook[column].apply(lambda x: self._split_text(x, action))
 
         return df_facebook
 
-    def _report_multiple_accounts(self, params, id_accounts):
+    def get_report(self, params, act_id, max_tries=10):
+        my_account = AdAccount(act_id)
+        for attempt in range(max_tries):
+            try:
+                async_job = my_account.get_insights(params=params, is_async=True)
+                self._debug(f"get_report | Intento {attempt+1} - Job lanzado correctamente")
+                break
+            except Exception as e:
+                self.verbose.critical(f"get_report | Error al iniciar job: {e}")
+                time.sleep(2 ** attempt)
+        else:
+            raise Exception("get_report | No se pudo iniciar el job después de múltiples intentos")
+
+        time.sleep(10)
+        tries = 0
+        while tries < 60:
+            status = async_job.api_get().get('async_status', '')
+            if status == 'Job Completed':
+                self._debug("get_report | Job completado")
+                return async_job.get_result()
+            elif status == 'Job Failed':
+                raise Exception("get_report | Job falló en el servidor de Meta")
+            else:
+                self._debug(f"get_report | Esperando... intento {tries+1}")
+                time.sleep(20)
+                tries += 1
+
+        raise TimeoutError("get_report | Timeout esperando el job")
+
+    def def_report_array_accounts(self, params, id_accounts):
+        self._debug("def_report_array_accounts | Procesando múltiples cuentas")
         array_df = []
-        for account in id_accounts:
-            self.verbose.log(f"[get_report_dataframe] Extrayendo datos para cuenta: {account}")
-            df = self.get_report_dataframe(params, account)
+        for acc in id_accounts:
+            self._debug(f"Cuenta: {acc}")
+            df = self.get_report_dataframe(params, acc)
             array_df.append(df)
-        return pd.concat(array_df, ignore_index=True)
+        return pd.concat(array_df)
 
     def _unique_actions(self, df):
-        if "actions" not in df:
-            return []
-        unique_actions = set()
-        for actions in df["actions"].fillna(""):
-            for action in actions:
-                if "action_type" in action:
-                    unique_actions.add(action["action_type"])
-        return unique_actions
+        self._debug("_unique_actions")
+        actions_per_column = {}
+        for column in df.columns:
+            if df[column].apply(lambda x: isinstance(x, list)).any():
+                actions_per_column[column] = set()
+                for all_actions in df[column].dropna():
+                    for action in all_actions:
+                        if "action_type" in action:
+                            actions_per_column[column].add(action["action_type"])
+        return actions_per_column
 
     def _split_text(self, text, action):
         if not isinstance(text, list):
             return 0
-        for item in text:
-            if item.get("action_type") == action:
-                return item.get("value", 0)
+        for element in text:
+            if element.get("action_type") == action:
+                return element.get("value", 0)
         return 0
