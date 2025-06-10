@@ -38,22 +38,44 @@ class Facebook_Marketing:
             self._debug("get_report_dataframe | Unsampled")
             unsampled_array = []
             date_range = pd.date_range(start=params["time_range"]["since"], end=params["time_range"]["until"])
-            for date in date_range:
+
+            for idx, date in enumerate(date_range):
                 str_date = date.strftime("%Y-%m-%d")
-                self._debug(f'{str_date}')
-                params["time_range"] = {'since': str_date, 'until': str_date}
-                report = self.get_report(params, act_id)
-                self._debug(f"get_report_dataframe | Report size {len(report)}")
-                if len(report) > 999:
-                    self.verbose.critical("get_report_dataframe | Report may be sampled")
+                params["time_range"] = {"since": str_date, "until": str_date}
+                self.verbose.log(f"[{idx+1}/{len(date_range)}] Extrayendo día {str_date} para {id_account}")
 
-                if len(report) == 0:
+                tries = 0
+                max_tries = 5
+                report = []
+
+                start_time = time.time()
+
+                while tries < max_tries:
+                    try:
+                        report = self.get_report(params, act_id)
+                        break
+                    except Exception as e:
+                        wait = 2 ** tries
+                        self.verbose.log(f"[{id_account}] Retry {tries+1}/{max_tries} para {str_date}. Esperando {wait}s: {e}")
+                        time.sleep(wait)
+                        tries += 1
+
+                if not report:
+                    self.verbose.critical(f"[{id_account}] No se pudo obtener datos para {str_date} tras {max_tries} intentos")
                     default_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
-                    df_facebook = pd.DataFrame(columns=default_cols)
+                    df_day = pd.DataFrame(columns=default_cols)
                 else:
-                    df_facebook = pd.DataFrame(report)
+                    df_day = pd.DataFrame(report)
+                    if len(report) > 999:
+                        self.verbose.critical(f"[{id_account}] Día {str_date}: Facebook devolvió más de 999 filas. Posible muestreo.")
 
-                unsampled_array.append(df_facebook)
+                duration = round(time.time() - start_time, 2)
+                self.verbose.log(f"[{id_account}] {str_date} completado en {duration} segundos")
+
+                unsampled_array.append(df_day)
+
+                self._debug(f"get_report_dataframe | Report size {len(report)}")
+
             df_facebook = pd.concat(unsampled_array)
 
         else:
