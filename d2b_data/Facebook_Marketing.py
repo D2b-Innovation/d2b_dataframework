@@ -1,187 +1,109 @@
-import math
 import time
+import math
+import pandas as pd
 from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
-from facebook_business.adobjects.adaccountuser import AdAccountUser
-from facebook_business.adobjects.campaign import Campaign as AdCampaign
 from facebook_business.adobjects.adsinsights import AdsInsights
-import pandas as pd
-import math
 
+class Facebook_Marketing:
+    def __init__(self, app_id, app_secret, access_token, unsampled=False, verbose_logger=None):
+        self.app_id = app_id
+        self.app_secret = app_secret
+        self.access_token = access_token
+        self.unsampled = unsampled
+        self.verbose = verbose_logger if verbose_logger else self._null_verbose()
+        self.cache_report = None
+        self.max_tries = 500
+        FacebookAdsApi.init(app_id, app_secret, access_token)
 
+    def _null_verbose(self):
+        class DummyVerbose:
+            def log(self, *args, **kwargs): pass
+            def critical(self, *args, **kwargs): pass
+        return DummyVerbose()
 
-class Facebook_Marketing():
-  def __init__(self, app_id,app_secret ,access_token,debug=False,unsampled=False,debug_level=0):
-    '''
-    args
-    app_id       <str>   App id provided by facebook
-    app_secret   <str>   app secret provided by facebook
-    access_token <str>   temporal string provided by facebook to logging
-    return @NONE
-    '''
-    self.app_id       = app_id
-    self.app_secret   = app_secret
-    self.access_token = access_token
-    self.cache_report = None
-    self.max_tries    = 500
-    self.service      = FacebookAdsApi.init(app_id, app_secret, access_token)
-    self.debug        = debug
-    self.unsampled    = unsampled
-    self.debug_level  = debug_level
+    def get_report(self, params, id_account):
+        try:
+            my_account = AdAccount(id_account)
+            async_job = my_account.get_insights(params=params, is_async=True)
+            self.verbose.log(f"[get_report] Descargando reporte para cuenta {id_account}")
+            tries = 0
+            while async_job.api_get().get('async_status', '') != 'Job Completed' and tries <= self.max_tries:
+                self.verbose.log(f"[get_report] Esperando reporte... intento {tries + 1}")
+                time.sleep(3)
+                tries += 1
 
-  def get_debug(self):
-    '''
-    '''
-    return self.debug
-  def get_debug_level(self):
-    '''
-    '''
-    return self.debug_level
+            result_job = async_job.get_result()
+            return result_job
+        except Exception as e:
+            self.verbose.critical(f"[get_report] Error en la extracción del reporte: {str(e)}")
+            return []
 
-  def get_cache_report(self):
-    '''
-    '''
-    return self.cache_report
+    def get_report_dataframe(self, params, id_account):
+        if isinstance(id_account, list):
+            return self._report_multiple_accounts(params, id_account)
 
-  def get_access_token(self):
-    '''
-    '''
-    return self.access_token
+        df_facebook = pd.DataFrame()
 
-  def get_app_id(self):
-    '''
-    '''
-    return self.app_id
+        if self.unsampled:
+            self.verbose.log("[get_report_dataframe] Extrayendo datos no muestreados (unsampled)")
+            date_range = pd.date_range(start=params["date_start"], end=params["date_stop"])
+            unsampled_array = []
 
-  def get_service(self):
-    '''
-    '''
-    return self.service
-  def get_app_secret(self):
-    '''
-    '''
-    return self.app_secret
+            for date in date_range:
+                str_date = date.strftime("%Y-%m-%d")
+                params["time_range"] = {"since": str_date, "until": str_date}
+                self.verbose.log(f"[get_report_dataframe] Día: {str_date}")
+                report = self.get_report(params, id_account)
+                if not report:
+                    self.verbose.log(f"[get_report_dataframe] Día {str_date} sin datos.")
+                    empty_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
+                    df_day = pd.DataFrame(columns=empty_cols)
+                else:
+                    df_day = pd.DataFrame(report)
 
-  def set_service(self,app_id):
-    '''
-    '''
-    if type(self,app_id) == str:
-      self.app_id = app_id
-    else:
-     raise ValueError('app_id must be a string')
-  def _debug(self,message,level=0 ):
-    if self.debug:
-      print(message)
+                unsampled_array.append(df_day)
 
-  def get_report(self,params,id_account):
-    my_account = AdAccount(id_account)
-    async_job = my_account.get_insights(params=params, is_async=True)
-    tries = 0
-    ''' Areglar esta parte OMAR '''
-    #while async_job.api_get().get('async_status','') != 'Job Completed' or tries<=self.max_tries:
-    self._debug(f'get_report | Starting Download Report ')
-    while async_job.api_get().get('async_status','') != 'Job Completed':
-      self._debug(f'get_report | {tries+1} -> {self.max_tries}')
-      self._debug(async_job.api_get())
-      time.sleep(3)
-      async_job.api_get()
-      tries +=1
-    result_job = async_job.get_result()
-    return result_job
+            df_facebook = pd.concat(unsampled_array, ignore_index=True)
 
-  def get_report_dataframe(self,params,id_account):
-    '''
-
-
-    '''
-    if type(id_account) == list:
-      self._debug("Report Type List")
-      #This line is to jump to the multiple id accounts
-      return self.def_report_array_accounts(params,id_account)
-
-    df_facebook = pd.DataFrame() # create an empty element as defalt element
-
-    # we detected 2 cases, the unsampled reports, that means multiple query to the same account, daily and itraday,
-    # when this is complete we concat both dataframe , the second case is the sampled report, that is direct  query
-    if self.unsampled:
-      self._debug(f"get_report_dataframe | Unsampled")
-      unsampled_array = []
-      date_range = pd.date_range(start=date_start, end=date_stop)
-      for date in date_range:
-        str_date = date.strftime("%Y-%m-%d")
-        if self.debug:
-          print(f'{str_date}')
-        params["time_range"] = {'since':str_date,'until':str_date}
-        print(f'{params}')
-        report = self.get_report(params,id_account)
-        self._debug(f"get_report_dataframe | Report size {len(report)}")
-        if len(report) > 999:
-          print("warning Report Sampled")
-        if len(report) == 0:
-          column_defalult_facebook = params.get("fields") + params.get("breakdowns") + ["date_start", "date_stop", "account_id"]
-          df_facebook = pd.DataFrame(columns=column_defalult_facebook)
         else:
-          df_facebook = pd.DataFrame(report)
+            report = self.get_report(params, id_account)
+            if not report:
+                empty_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
+                df_facebook = pd.DataFrame(columns=empty_cols)
+            else:
+                df_facebook = pd.DataFrame(report)
 
-        unsampled_array.append(df_facebook)
-      df_facebook = pd.concat(unsampled_array)
+        # Procesamiento de acciones si existen
+        if "actions" in df_facebook.columns:
+            for action in self._unique_actions(df_facebook):
+                df_facebook[f"_action_{action}"] = df_facebook["actions"].apply(lambda x: self._split_text(x, action))
+            df_facebook.drop(columns=["actions"], inplace=True)
 
-    else:
-      report = self.get_report(params,id_account)
-      if len(report) == 0:
-        column_defalult_facebook = params.get("fields") + params.get("breakdowns") + ["date_start", "date_stop", "account_id"]
-        df_facebook = pd.DataFrame(columns=column_defalult_facebook)
-      else:
-        df_facebook = pd.DataFrame(report)
+        return df_facebook
 
-    #unest the action field comming from Facebook
-    if "actions" in df_facebook:
-        for unique_action in self._unique_actions(df_facebook):
-          df_facebook["_action_"+unique_action] = df_facebook["actions"].apply(lambda x :self._split_text(x,unique_action))
-        df_facebook = df_facebook.drop(columns="actions")
-    return df_facebook
+    def _report_multiple_accounts(self, params, id_accounts):
+        array_df = []
+        for account in id_accounts:
+            self.verbose.log(f"[get_report_dataframe] Extrayendo datos para cuenta: {account}")
+            df = self.get_report_dataframe(params, account)
+            array_df.append(df)
+        return pd.concat(array_df, ignore_index=True)
 
-  def def_report_array_accounts(self,params,id_account):
-    self._debug("list in")
-    array_df = []
-    for account in id_account:
-      if self.debug :
-        print(f"{account}")
-      DF_results = self.get_report_dataframe(params,account)
-      #DF_results["id_account"] = account
-      array_df.append(DF_results)
-    return pd.concat(array_df)
+    def _unique_actions(self, df):
+        if "actions" not in df:
+            return []
+        unique_actions = set()
+        for actions in df["actions"].fillna(""):
+            for action in actions:
+                if "action_type" in action:
+                    unique_actions.add(action["action_type"])
+        return unique_actions
 
-  def _unique_actions(self,df):
-    '''
-    The functions is designed to get the unique values for the action_type field
-    args <DataFrame>  DataFrame with action_type columns
-    return
-    set unique actions presented in the DataFrame
-    '''
-    if "actions" not in df:
-        return []
-    unique_actions = set()
-    for all_actions in df["actions"].fillna(""):
-      for single_action in all_actions:
-        unique_actions.add(single_action.get("action_type"))
-    return unique_actions
-
-  def _split_text(self,text,action):
-    if type(text)==float or type(text)==int and math.isnan(text):
-      return 0
-    else:
-      for elements in text:
-        if elements.get("action_type") == action:
-          return elements.get("value")
-    return 0
-
-import math
-def split_text(text,action):
-  if type(text)==float or type(text)==int and math.isnan(text):
-    return 0
-  else:
-    for elements in text:
-      if elements.get("action_type") == action:
-        return elements.get("value")
-  return 0
+    def _split_text(self, text, action):
+        if not isinstance(text, list):
+            return 0
+        for item in text:
+            if item.get("action_type") == action:
+                return item.get("value", 0)
+        return 0
