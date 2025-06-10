@@ -62,7 +62,7 @@ def load_schema_from_csv(verbose_logger_func, wf_name_func):
 
     return schema_table_local
 
-def extract_and_write_temp_credentials(client_name_from_map, source_csv_path, verbose_logger_param, current_workflow_name_param):
+def extract_and_write_temp_credentials(client_name_from_map, source_csv_path, verbose_logger_param, current_workflow_name_param, project_map_dict):
     """
     Extrae las credenciales de un cliente desde un CSV y las escribe en un archivo temporal.
     Args:
@@ -74,7 +74,7 @@ def extract_and_write_temp_credentials(client_name_from_map, source_csv_path, ve
         str: Ruta al archivo temporal con las credenciales JSON, o None si hubo error.
     """
     verbose_logger_param.log(f"extract_and_write_temp_credentials | Buscando credenciales para cliente: {client_name_from_map} en CSV: {source_csv_path}")
-    project_id_to_check_internally = CLIENT_NAME_TO_PROJECT_ID_IN_JSON.get(client_name_from_map)
+    project_id_to_check_internally = project_map_dict.get(client_name_from_map)
     if not project_id_to_check_internally:
         verbose_logger_param.log(f"extract_and_write_temp_credentials | ADVERTENCIA: No se encontró mapeo de project_id para validación interna de '{client_name_from_map}'.")
 
