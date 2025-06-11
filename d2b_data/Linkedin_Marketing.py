@@ -199,7 +199,7 @@ class Linkedin_Marketing():
                 logger.log(f"upload_to_bigquery | Subiendo {iter_df.shape[0]} filas a {project_id}.{full_table} (modo replace).")
 
             bq_client.upload(
-                df=iter_df,
+                dataframe=iter_df,
                 date_column="date",
                 destination=full_table,
                 project_id=project_id,
