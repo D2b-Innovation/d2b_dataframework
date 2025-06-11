@@ -151,63 +151,60 @@ class Linkedin_Marketing():
           res = self._clean_and_transform_dataFrame(res)
           return res
     
-  def upload_to_bigquery(self, df, bq_config, credentials_info, workflow_name="linkedin-cloud"):
+  def upload_to_bigquery_by_day(self, df, bq_config, credentials_info, schema, workflow_name="linkedin-cloud"):
     """
-    Sube el DataFrame de LinkedIn Ads a una tabla particionada por fecha en BigQuery.
+    Sube el DataFrame de LinkedIn Ads a una única tabla en BigQuery, escribiendo una partición por día.
 
     Args:
-        df (pd.DataFrame): DataFrame con datos limpios.
-        bq_config (dict): Configuración de destino BigQuery (project-id, dataset, table-prefix).
-        credentials_info (dict): Credenciales de servicio como dict.
+        df (pd.DataFrame): DataFrame con columna 'date'.
+        bq_config (dict): Contiene dataset, project-id y table-prefix.
+        credentials_info (dict): SA como dict para autenticación.
+        schema (list): Lista de dicts con 'name', 'type' y 'description' para schema de tabla.
         workflow_name (str): Nombre del flujo para logs.
     """
     logger = self.verbose_logger
-
     if df.empty:
-        msg = "upload_to_bigquery | DataFrame vacío. No se realizará carga."
-        if logger:
-            logger.critical(msg, workflow_name)
+        msg = "DataFrame vacío, no se sube nada a BigQuery."
+        logger.critical(msg, workflow_name)
         raise ValueError(msg)
 
     if "date" not in df.columns:
-        msg = "upload_to_bigquery | La columna 'date' es obligatoria en el dataframe."
-        if logger:
-            logger.critical(msg, workflow_name)
+        msg = "Columna 'date' ausente en el DataFrame."
+        logger.critical(msg, workflow_name)
         raise ValueError(msg)
 
-    try:
-        dataset = bq_config["dataset"]
-        table_prefix = bq_config["table-prefix"]
-        project_id = bq_config["project-id"]
-    except Exception as e:
-        msg = f"upload_to_bigquery | Error en configuración BigQuery: {e}"
-        if logger:
-            logger.critical(msg, workflow_name)
-        raise ValueError(msg)
-
-    bq_client = Google_Bigquery(credentials_info=credentials_info, verbose=True)
     df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+
+    table_prefix = bq_config["table-prefix"]
+    dataset = bq_config["dataset"]
+    project_id = bq_config["project-id"]
 
     full_table = f"{dataset}.{table_prefix}"
 
-    if logger:
-        logger.log(f"upload_to_bigquery | Subiendo {df.shape[0]} filas a {project_id}.{full_table} (append particionado).")
+    client = bigquery.Client(project=project_id, credentials=service_account.Credentials.from_service_account_info(credentials_info))
 
-    try:
-        bq_client.upload(
-            dataframe=df,
-            date_column="date",
-            destination=full_table,
-            project_id=project_id,
-            if_exists="append",  # Append en tabla particionada
-            partition_column="date"
-        )
+    for date_str in df["date"].unique():
+        iter_df = df[df["date"] == date_str].copy()
+        logger.log(f"Subiendo {iter_df.shape[0]} filas para fecha {date_str} a tabla {full_table}")
 
-        if logger:
-            logger.log("upload_to_bigquery | Carga finalizada en tabla particionada.")
+        try:
+            to_gbq(
+                dataframe=iter_df,
+                destination_table=full_table,
+                project_id=project_id,
+                credentials=client._credentials,
+                if_exists="append",
+                table_schema=schema
+            )
+            # Set expiración
+            table_ref = client.dataset(dataset).table(table_prefix)
+            table_obj = client.get_table(table_ref)
+            table_obj.expires = datetime.utcnow() + timedelta(days=1096)
+            client.update_table(table_obj, ["expires"])
 
-    except Exception as e_upload:
-        msg = f"upload_to_bigquery | Error al subir a BigQuery: {e_upload}"
-        if logger:
-            logger.critical(msg, workflow_name)
-        raise
+            logger.log(f"Fecha {date_str} cargada exitosamente a {full_table} y expiración actualizada.")
+        except Exception as e:
+            logger.critical(f"Error subiendo {date_str} a {full_table}: {e}", workflow_name)
+            continue
+
+    logger.log(f"Proceso finalizado para {len(df['date'].unique())} fechas en tabla única particionada.")
