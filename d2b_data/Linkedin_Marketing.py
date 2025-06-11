@@ -3,7 +3,8 @@ import json
 import requests
 from os.path import exists
 from requests.structures import CaseInsensitiveDict
-from d2b_data.verbose_logger import Verbose  # ← Usamos tu clase de logs
+from d2b_data.verbose_logger import Verbose  
+from d2b_data.Google_Bigquery import Google_Bigquery
 
 class Linkedin_Marketing():
   def __init__(self, APPLICATON_KEY, APPLICATON_SECRET):
