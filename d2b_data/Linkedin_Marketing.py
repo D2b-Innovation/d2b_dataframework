@@ -86,31 +86,30 @@ class Linkedin_Marketing():
       raise Exception(res.content)
     return res.content
 
-  def _clean_and_transform_dataFrame(self, res):
-    if isinstance(res, bytes):
-        res = json.loads(res.decode("utf-8"))
-    elif isinstance(res, str):
-        res = json.loads(res)
-    elif not isinstance(res, dict):
-        raise TypeError(f"Formato inesperado: se esperaba dict, str o bytes, no {type(res)}")
+  def _clean_and_transform_dataFrame(self, res, date_str=None):
+      # Asegurarse de que `res` sea un dict (puede venir como string o bytes)
+      if isinstance(res, bytes):
+          res = json.loads(res.decode("utf-8"))
+      elif isinstance(res, str):
+          res = json.loads(res)
 
-    DF = pd.json_normalize(res.get("elements"), sep="_")
+      DF = pd.json_normalize(res.get("elements"), sep="_")
 
-    # Si existen las columnas de fecha, generamos 'date'
-    if all(f"dateRange.start.{key}" in DF.columns for key in ["year", "month", "day"]):
-        DF["date"] = pd.to_datetime(
-            DF["dateRange.start.year"].astype(str) + "-" +
-            DF["dateRange.start.month"].astype(str).str.zfill(2) + "-" +
-            DF["dateRange.start.day"].astype(str).str.zfill(2),
-            format='%Y-%m-%d'
-        )
-        DF.drop(columns=[
-            "dateRange.start.year", "dateRange.start.month", "dateRange.start.day",
-            "dateRange.end.year", "dateRange.end.month", "dateRange.end.day"
-        ], inplace=True, errors='ignore')
+      if date_str:
+          DF["date"] = date_str  # AÑADIMOS AQUÍ LA COLUMNA DATE EXPLÍCITAMENTE
 
-    DF.columns = [x.lower() for x in DF.columns]
-    return DF
+      # Aplanar columnas y limpiar otras fechas
+      date_cols = [
+          "dateRange.start.month", "dateRange.start.day", "dateRange.start.year",
+          "dateRange.end.month", "dateRange.end.day", "dateRange.end.year"
+      ]
+      for col in date_cols:
+          if col in DF.columns:
+              DF.drop(columns=col, inplace=True)
+
+      DF.columns = [x.lower() for x in DF.columns]
+
+      return DF
 
   def get_report_dataframe(self, account_id, start, end, metrics, unsampled=False):
       if unsampled:
@@ -131,9 +130,9 @@ class Linkedin_Marketing():
               elif isinstance(res, str):
                   res = json.loads(res)
 
-              res["date"] = date_str
-              res = self._clean_and_transform_dataFrame(res)
-              array_reports.append(res)
+              # ✅ Solo pasamos `date_str`, el método se encarga de agregarlo al DF
+              df = self._clean_and_transform_dataFrame(res, date_str=date_str)
+              array_reports.append(df)
 
           return pd.concat(array_reports)
 
