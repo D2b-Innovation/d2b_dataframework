@@ -128,3 +128,51 @@ class Linkedin_Marketing():
       res = self.get_report(account_id, start, end, metrics)
       res = self._clean_and_transform_dataFrame(res)
       return res
+    
+  def upload_to_bigquery(self, df, bq_config, credentials_info, workflow_name="linkedin-cloud"):
+    """
+    Procesa y sube un dataframe de LinkedIn Ads a BigQuery.
+
+    Args:
+        df (pd.DataFrame): Dataframe con los datos ya extraídos y limpios.
+        bq_config (dict): Configuración de destino BigQuery (dataset, table-prefix, project-id).
+        credentials_info (dict): Credenciales SA como dict.
+        workflow_name (str): Nombre del flujo para trazabilidad.
+    """
+    logger = self.verbose_logger  # para abreviar
+
+    if df.empty:
+        msg = "upload_to_bigquery | DataFrame vacío. No se realizará carga."
+        if logger:
+            logger.critical(msg, workflow_name)
+        raise ValueError(msg)
+
+    if "date" not in df.columns:
+        msg = "upload_to_bigquery | La columna 'date' es obligatoria en el dataframe."
+        if logger:
+            logger.critical(msg, workflow_name)
+        raise ValueError(msg)
+
+    try:
+        dataset = bq_config["dataset"]
+        table_prefix = bq_config["table-prefix"]
+        project_id = bq_config["project-id"]
+    except Exception as e:
+        msg = f"upload_to_bigquery | Error en configuración BigQuery: {e}"
+        if logger:
+            logger.critical(msg, workflow_name)
+        raise ValueError(msg)
+
+    try:
+        bq = Google_Bigquery(credentials_info=credentials_info, verbose=True)
+        full_table = f"{dataset}.{table_prefix}"
+        if logger:
+            logger.log(f"upload_to_bigquery | Subiendo a BigQuery: {project_id}.{full_table} con {df.shape[0]} filas.")
+        bq.upload(df, date_column="date", destination=full_table, project_id=project_id)
+        if logger:
+            logger.log("upload_to_bigquery | Carga a BigQuery completada exitosamente.")
+    except Exception as e_upload:
+        msg = f"upload_to_bigquery | Error al subir a BigQuery: {e_upload}"
+        if logger:
+            logger.critical(msg, workflow_name)
+        raise
