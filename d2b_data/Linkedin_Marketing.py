@@ -115,12 +115,15 @@ class Linkedin_Marketing():
         self.verbose_logger.log("Extracción UNSAMPLED activada")
       date_range = pd.date_range(start, end, freq='D')
       array_reports = []
-      for date in date_range.strftime('%Y-%m-%d'):
-        if self.verbose_logger:
-          self.verbose_logger.log(f"Extrayendo fecha {date}")
-        res = self.get_report(account_id, date, date, metrics)
-        res = self._clean_and_transform_dataFrame(res)
-        array_reports.append(res)
+      for date in date_range:
+          date_str = date.strftime('%Y-%m-%d')  # ISO format como string
+          if self.verbose_logger:
+              self.verbose_logger.log(f"Extrayendo fecha {date_str}")
+          res = self.get_report(account_id, date_str, date_str, metrics)
+          res["date"] = date_str  # Aquí también usar string
+          res = self._clean_and_transform_dataFrame(res)
+          array_reports.append(res)
+
       return pd.concat(array_reports)
     else:
       if self.verbose_logger:
