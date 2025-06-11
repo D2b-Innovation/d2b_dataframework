@@ -110,27 +110,43 @@ class Linkedin_Marketing():
     return DF
 
   def get_report_dataframe(self, account_id, start, end, metrics, unsampled=False):
-    if unsampled:
-      if self.verbose_logger:
-        self.verbose_logger.log("Extracción UNSAMPLED activada")
-      date_range = pd.date_range(start, end, freq='D')
-      array_reports = []
-      for date in date_range:
-          date_str = date.strftime('%Y-%m-%d')  # ISO format como string
+      if unsampled:
           if self.verbose_logger:
-              self.verbose_logger.log(f"Extrayendo fecha {date_str}")
-          res = self.get_report(account_id, date_str, date_str, metrics)
-          res["date"] = date_str  # Aquí también usar string
-          res = self._clean_and_transform_dataFrame(res)
-          array_reports.append(res)
+              self.verbose_logger.log("Extracción UNSAMPLED activada")
+          date_range = pd.date_range(start, end, freq='D')
+          array_reports = []
 
-      return pd.concat(array_reports)
-    else:
-      if self.verbose_logger:
-        self.verbose_logger.log("Extracción con un solo llamado (sampled)")
-      res = self.get_report(account_id, start, end, metrics)
-      res = self._clean_and_transform_dataFrame(res)
-      return res
+          for date in date_range:
+              date_str = date.strftime('%Y-%m-%d')
+              if self.verbose_logger:
+                  self.verbose_logger.log(f"Extrayendo fecha {date_str}")
+              res = self.get_report(account_id, date_str, date_str, metrics)
+
+              # Decodificar si es necesario
+              if isinstance(res, bytes):
+                  res = json.loads(res.decode("utf-8"))
+              elif isinstance(res, str):
+                  res = json.loads(res)
+
+              res["date"] = date_str
+              res = self._clean_and_transform_dataFrame(res)
+              array_reports.append(res)
+
+          return pd.concat(array_reports)
+
+      else:
+          if self.verbose_logger:
+              self.verbose_logger.log("Extracción con un solo llamado (sampled)")
+          res = self.get_report(account_id, start, end, metrics)
+
+          # Decodificar si es necesario
+          if isinstance(res, bytes):
+              res = json.loads(res.decode("utf-8"))
+          elif isinstance(res, str):
+              res = json.loads(res)
+
+          res = self._clean_and_transform_dataFrame(res)
+          return res
     
   def upload_to_bigquery(self, df, bq_config, credentials_info, workflow_name="linkedin-cloud"):
     """
