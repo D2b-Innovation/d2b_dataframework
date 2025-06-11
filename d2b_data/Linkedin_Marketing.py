@@ -153,15 +153,15 @@ class Linkedin_Marketing():
     
   def upload_to_bigquery(self, df, bq_config, credentials_info, workflow_name="linkedin-cloud"):
     """
-    Procesa y sube un dataframe de LinkedIn Ads a BigQuery.
+    Sube el DataFrame de LinkedIn Ads a BigQuery, creando una tabla por día (YYYYMMDD) y sobrescribiendo si existe.
 
     Args:
-        df (pd.DataFrame): Dataframe con los datos ya extraídos y limpios.
-        bq_config (dict): Configuración de destino BigQuery (dataset, table-prefix, project-id).
-        credentials_info (dict): Credenciales SA como dict.
-        workflow_name (str): Nombre del flujo para trazabilidad.
+        df (pd.DataFrame): DataFrame con datos limpios.
+        bq_config (dict): Configuración de destino BigQuery (project-id, dataset, table-prefix).
+        credentials_info (dict): Credenciales de servicio como dict.
+        workflow_name (str): Nombre del flujo para logs.
     """
-    logger = self.verbose_logger  # para abreviar
+    logger = self.verbose_logger  # Alias para el logger
 
     if df.empty:
         msg = "upload_to_bigquery | DataFrame vacío. No se realizará carga."
@@ -186,13 +186,32 @@ class Linkedin_Marketing():
         raise ValueError(msg)
 
     try:
-        bq = Google_Bigquery(credentials_info=credentials_info, verbose=True)
-        full_table = f"{dataset}.{table_prefix}"
+        bq_client = Google_Bigquery(credentials_info=credentials_info, verbose=True)
+        df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")  # Asegura formato uniforme
+
+        for date_str in df["date"].unique():
+            iter_df = df[df["date"] == date_str].copy()
+            suffix = date_str.replace("-", "")  # YYYYMMDD
+            table_name = f"{table_prefix}_{suffix}"
+            full_table = f"{dataset}.{table_name}"
+
+            if logger:
+                logger.log(f"upload_to_bigquery | Subiendo {iter_df.shape[0]} filas a {project_id}.{full_table} (modo replace).")
+
+            bq_client.upload(
+                df=iter_df,
+                date_column="date",
+                destination=full_table,
+                project_id=project_id,
+                if_exists="replace"  # Sobrescribe la tabla diaria
+            )
+
+            # Setear expiración opcional si tenés esa lógica implementada en tu clase Google_Bigquery
+            # bq_client.set_table_expiration(full_table, days=1096)
+
         if logger:
-            logger.log(f"upload_to_bigquery | Subiendo a BigQuery: {project_id}.{full_table} con {df.shape[0]} filas.")
-        bq.upload(df, date_column="date", destination=full_table, project_id=project_id)
-        if logger:
-            logger.log("upload_to_bigquery | Carga a BigQuery completada exitosamente.")
+            logger.log("upload_to_bigquery | Carga completa para todas las fechas.")
+
     except Exception as e_upload:
         msg = f"upload_to_bigquery | Error al subir a BigQuery: {e_upload}"
         if logger:
