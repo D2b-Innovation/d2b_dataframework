@@ -34,7 +34,7 @@ class Linkedin_Marketing():
       access_token = json_content.get('access_token')
       self.set_headers_token(access_token)
       if self.verbose_logger:
-        self.verbose_logger.log("Token cargado desde archivo", level="info")
+        self.verbose_logger.log("Token cargado desde archivo")
       return self.HEADERS
 
     url_token_endpoint = "https://www.linkedin.com/oauth/v2/accessToken"
@@ -58,7 +58,7 @@ class Linkedin_Marketing():
       self.token = json_token.get('access_token')
       self.set_headers_token(self.token)
       if self.verbose_logger:
-        self.verbose_logger.log("Nuevo token obtenido desde API", level="info")
+        self.verbose_logger.log("Nuevo token obtenido desde API")
     else:
       raise ValueError('Error getting token:' + res_token.content.decode())
     return self.token
@@ -82,7 +82,7 @@ class Linkedin_Marketing():
     res = requests.get(url, headers=self.HEADERS)
     if res.status_code != 200:
       if self.verbose_logger:
-        self.verbose_logger.log(f"Error en respuesta de API: {res.status_code} - {res.content}", level="critical")
+        self.verbose_logger.log(f"Error en respuesta de API: {res.status_code} - {res.content}")
       raise Exception(res.content)
     return res.content
 
@@ -112,19 +112,19 @@ class Linkedin_Marketing():
   def get_report_dataframe(self, account_id, start, end, metrics, unsampled=False):
     if unsampled:
       if self.verbose_logger:
-        self.verbose_logger.log("Extracción UNSAMPLED activada", level="info")
+        self.verbose_logger.log("Extracción UNSAMPLED activada")
       date_range = pd.date_range(start, end, freq='D')
       array_reports = []
       for date in date_range.strftime('%Y-%m-%d'):
         if self.verbose_logger:
-          self.verbose_logger.log(f"Extrayendo fecha {date}", level="info")
+          self.verbose_logger.log(f"Extrayendo fecha {date}")
         res = self.get_report(account_id, date, date, metrics)
         res = self._clean_and_transform_dataFrame(res)
         array_reports.append(res)
       return pd.concat(array_reports)
     else:
       if self.verbose_logger:
-        self.verbose_logger.log("Extracción con un solo llamado (sampled)", level="info")
+        self.verbose_logger.log("Extracción con un solo llamado (sampled)")
       res = self.get_report(account_id, start, end, metrics)
       res = self._clean_and_transform_dataFrame(res)
       return res
