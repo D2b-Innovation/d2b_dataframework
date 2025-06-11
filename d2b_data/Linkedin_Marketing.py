@@ -87,24 +87,27 @@ class Linkedin_Marketing():
     return res.content
 
   def _clean_and_transform_dataFrame(self, res):
-    res = json.loads(res)
+    if isinstance(res, bytes):
+        res = json.loads(res.decode("utf-8"))
+    elif isinstance(res, str):
+        res = json.loads(res)
+    elif not isinstance(res, dict):
+        raise TypeError(f"Formato inesperado: se esperaba dict, str o bytes, no {type(res)}")
+
     DF = pd.json_normalize(res.get("elements"), sep="_")
 
-    if "dateRange.start.day" in DF.columns:
-      DF["date"] = pd.to_datetime(
-          DF["dateRange.start.year"].astype(str) + "-" +
-          DF["dateRange.start.month"].astype(str) + "-" +
-          DF["dateRange.start.day"].astype(str),
-          format='%Y-%m-%d'
-      )
-
-      date_cols = [
-        "dateRange.start.month", "dateRange.start.day", "dateRange.start.year",
-        "dateRange.end.month", "dateRange.end.day", "dateRange.end.year"
-      ]
-      for col in date_cols:
-        if col in DF.columns:
-          DF = DF.drop(columns=col)
+    # Si existen las columnas de fecha, generamos 'date'
+    if all(f"dateRange.start.{key}" in DF.columns for key in ["year", "month", "day"]):
+        DF["date"] = pd.to_datetime(
+            DF["dateRange.start.year"].astype(str) + "-" +
+            DF["dateRange.start.month"].astype(str).str.zfill(2) + "-" +
+            DF["dateRange.start.day"].astype(str).str.zfill(2),
+            format='%Y-%m-%d'
+        )
+        DF.drop(columns=[
+            "dateRange.start.year", "dateRange.start.month", "dateRange.start.day",
+            "dateRange.end.year", "dateRange.end.month", "dateRange.end.day"
+        ], inplace=True, errors='ignore')
 
     DF.columns = [x.lower() for x in DF.columns]
     return DF
