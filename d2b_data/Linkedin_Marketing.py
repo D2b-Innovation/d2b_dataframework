@@ -5,6 +5,7 @@ from os.path import exists
 from requests.structures import CaseInsensitiveDict
 from d2b_data.verbose_logger import Verbose  
 from d2b_data.Google_Bigquery import Google_Bigquery
+from pandas_gbq import to_gbq
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
