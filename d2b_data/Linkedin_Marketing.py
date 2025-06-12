@@ -8,6 +8,7 @@ from d2b_data.Google_Bigquery import Google_Bigquery
 from pandas_gbq import to_gbq
 from google.cloud import bigquery
 from google.oauth2 import service_account
+from datetime import datetime, timedelta
 
 class Linkedin_Marketing():
   def __init__(self, APPLICATON_KEY, APPLICATON_SECRET):
