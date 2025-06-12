@@ -5,6 +5,7 @@ from os.path import exists
 from requests.structures import CaseInsensitiveDict
 from d2b_data.verbose_logger import Verbose  
 from d2b_data.Google_Bigquery import Google_Bigquery
+from google.cloud import bigquery
 
 class Linkedin_Marketing():
   def __init__(self, APPLICATON_KEY, APPLICATON_SECRET):
