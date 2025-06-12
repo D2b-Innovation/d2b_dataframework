@@ -197,7 +197,7 @@ class Linkedin_Marketing():
                 destination_table=full_table,
                 project_id=project_id,
                 credentials=client._credentials,
-                if_exists="append",
+                if_exists="replace",
                 table_schema=schema
             )
             # Set expiración
