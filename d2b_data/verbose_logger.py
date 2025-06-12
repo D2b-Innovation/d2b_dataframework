@@ -34,5 +34,5 @@ class Verbose:
 
 # CONFIGURACIÓN GLOBAL
 VERBOSE_ACTIVE = True
-ALERTS_ENABLED = True
+ALERTS_ENABLED = False  # Cambiar a True para activar alertas
 verbose_logger = Verbose(active=VERBOSE_ACTIVE, alerts_enabled=ALERTS_ENABLED)
