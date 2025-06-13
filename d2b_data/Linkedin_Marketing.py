@@ -176,8 +176,10 @@ class Linkedin_Marketing():
           res = self.get_report(account_id, start, end, metrics, **kwargs)
           return self.clean_and_transform_dataFrame(res)
     
-  # (MEJORA) Se elimina la variable 'table_config' y se apaga el progress_bar
   def upload_to_bigquery(self, df, bq_config, credentials_info, schema):
+    """
+    Sube un DataFrame a una tabla particionada en BigQuery y luego setea su expiración.
+    """
     logger = self.verbose_logger
     if df.empty:
         logger.log("DataFrame vacío, no se sube nada a BigQuery.")
@@ -188,28 +190,56 @@ class Linkedin_Marketing():
         logger.critical(msg)
         raise ValueError(msg)
 
+    # Asegurarse que la columna de particionamiento es de tipo correcto
     df["date"] = pd.to_datetime(df["date"])
 
     table_prefix = bq_config["table-prefix"]
     dataset = bq_config["dataset"]
     project_id = bq_config["project-id"]
+    destination_table = f"{dataset}.{table_prefix}"
     full_table_id = f"{project_id}.{dataset}.{table_prefix}"
     
     logger.log(f"Iniciando subida de {df.shape[0]} filas a la tabla particionada: {full_table_id}")
 
     try:
+        # 1. CARGAR LOS DATOS
+        credentials_gbq = service_account.Credentials.from_service_account_info(credentials_info)
         to_gbq(
             dataframe=df,
-            destination_table=f"{dataset}.{table_prefix}",
+            destination_table=destination_table,
             project_id=project_id,
-            credentials=service_account.Credentials.from_service_account_info(credentials_info),
+            credentials=credentials_gbq,
             if_exists="append",
             table_schema=schema,
-            progress_bar=False, # Mejor para entornos automatizados
+            progress_bar=False,
             api_method='load_csv'
         )
         logger.log(f"Subida a {full_table_id} completada exitosamente.")
 
-    except Exception as e:
-        logger.critical(f"Error subiendo datos a BigQuery con to_gbq: {e}")
-        raise
+        # --- SETEAR EXPIRACIÓN ---
+        # 2. Una vez que la carga es exitosa, se actualiza la expiración de la tabla.
+        try:
+            logger.log(f"Actualizando la expiración para la tabla {full_table_id}...")
+            
+            # Crear un cliente de BigQuery para operaciones de metadatos
+            bq_client = bigquery.Client(project=project_id, credentials=credentials_gbq)
+            
+            # Obtener la referencia de la tabla
+            table_ref = bq_client.get_table(destination_table)
+            
+            # Calcular la nueva fecha de expiración (aprox. 3 años)
+            expiration_date = datetime.utcnow() + timedelta(days=1096)
+            table_ref.expires = expiration_date
+            
+            # Actualizar la tabla en BigQuery, especificando que solo se cambia la expiración
+            bq_client.update_table(table_ref, ["expires"])
+            
+            logger.log(f"Expiración para la tabla {full_table_id} actualizada a {expiration_date.strftime('%Y-%m-%d')}.")
+
+        except Exception as e_expires:
+            # Si falla, no es un error crítico. Solo loguear una advertencia.
+            logger.log(f"ADVERTENCIA: No se pudo actualizar la expiración para la tabla {full_table_id}. Error: {e_expires}")
+
+    except Exception as e_upload:
+        logger.critical(f"Error subiendo datos a BigQuery con to_gbq: {e_upload}")
+        raise # Volvemos a lanzar la excepción para que la Cloud Function falle y alerte
