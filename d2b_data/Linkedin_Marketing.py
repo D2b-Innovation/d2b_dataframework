@@ -100,54 +100,37 @@ class Linkedin_Marketing():
     return res.content
 
   def _clean_and_transform_dataFrame(self, res, date_str=None):
+    # 1. Decodificar y normalizar la respuesta JSON
     if isinstance(res, bytes):
         res = json.loads(res.decode("utf-8"))
-    elif isinstance(res, str):
-        res = json.loads(res)
-
-    if self.verbose_logger:
-        self.verbose_logger.log("Normalizando respuesta JSON.")
-    
     DF = pd.json_normalize(res.get("elements"), sep="_")
 
     if DF.empty:
-        if self.verbose_logger:
-            self.verbose_logger.log("DataFrame vacío después de normalizar JSON.")
         return DF
 
+    # 2. Limpieza genérica y esencial
+    
+    # Asegurar que la columna 'date' se cree y sea de tipo datetime
     if date_str:
         DF["date"] = date_str
-    elif "daterange_start_year" in DF.columns and "daterange_start_month" in DF.columns and "daterange_start_day" in DF.columns:
-        date_df = DF[["daterange_start_year", "daterange_start_month", "daterange_start_day"]].copy()
-        date_df.columns = ["year", "month", "day"]
-        DF["date"] = pd.to_datetime(date_df)
-    
     if "date" in DF.columns:
         DF["date"] = pd.to_datetime(DF["date"])
 
-    date_cols_to_drop = ["daterange_start_month", "daterange_start_day", "daterange_start_year", "daterange_end_month", "daterange_end_day", "daterange_end_year"]
-    cols_to_drop_existing = [col for col in date_cols_to_drop if col in DF.columns]
-    if cols_to_drop_existing:
-        DF.drop(columns=cols_to_drop_existing, inplace=True)
-    
+    # Aplanar cualquier columna con JSON anidado (como 'adentities')
     if 'adentities' in DF.columns:
-        if self.verbose_logger:
-            self.verbose_logger.log("Aplanando columna 'adentities' a string JSON.")
-        # Se aplica una función a cada celda de la columna
-        DF['adentities'] = DF['adentities'].apply(lambda x: json.dumps(x) if x is not None else None)
+        DF['adentities'] = DF['adentities'].apply(lambda x: json.dumps(x) if pd.notna(x) else None)
 
-    # --- El resto del método sigue igual ---
+    # Limpiar nombres de columnas a un formato estándar
     DF.columns = (
         DF.columns
         .str.strip()
         .str.lower()
         .str.replace(" ", "_", regex=False)
         .str.replace("-", "_", regex=False)
-        .str.replace(r"[\W]", "", regex=True) # Corregí un poco la regex para que sea más robusta
+        .str.replace(r"[^\w]", "", regex=True)
     )
-
-    if self.verbose_logger:
-        self.verbose_logger.log(f"DataFrame limpio con shape final: {DF.shape}")
+    
+    self.verbose_logger.log(f"DataFrame crudo pero limpio generado. Columnas: {DF.columns.tolist()}")
     return DF
   
   def get_report_dataframe(self, account_id, start, end, metrics, unsampled=False, **kwargs):
