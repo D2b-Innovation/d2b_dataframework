@@ -71,7 +71,7 @@ class Linkedin_Marketing():
     return self.token
 
   # (MEJORA) Se añaden 'pivot' y 'time_granularity' como parámetros
-  def get_report(self, account_id, start, end, metrics, pivot="CREATIVE", time_granularity="DAILY"):
+  def get_report(self, account_id, start, end, metrics, pivot="CAMPAIGN_GROUP,CAMPAIGN", time_granularity="DAILY"):
     account_id = f"urn%3Ali%3AsponsoredAccount%3A{account_id}"
 
     start_parts = start.split("-")
