@@ -146,7 +146,7 @@ class Linkedin_Marketing():
               elif isinstance(res, str):
                   res = json.loads(res)
 
-              # ✅ Solo pasamos `date_str`, el método se encarga de agregarlo al DF
+              # Solo pasamos `date_str`, el método se encarga de agregarlo al DF
               df = self._clean_and_transform_dataFrame(res, date_str=date_str)
               array_reports.append(df)
 
