@@ -79,37 +79,65 @@ class Linkedin_Marketing():
     if self.verbose_logger: self.verbose_logger.log(f"DataFrame crudo generado. Columnas: {DF.columns.tolist()}")
     return DF
 
-  def upload_to_bigquery(self, df, bq_config, credentials_info, schema):
-    # Esta es la única función de subida. No hay doble carga aquí.
+  def upload_to_bigquery_by_day(self, df, bq_config, credentials_info, schema):
+    """
+    Sube el DataFrame a BigQuery creando una tabla separada para cada día.
+    El nombre de cada tabla tendrá el sufijo _YYYYMMDD.
+    """
     logger = self.verbose_logger
     if df.empty:
-        logger.log("DataFrame vacío, no se sube a BQ.")
+        logger.log("DataFrame vacío, no se sube nada a BQ.")
         return
+
+    # Nos aseguramos de que 'date' sea un objeto datetime para poder iterar
+    df['date'] = pd.to_datetime(df['date'])
 
     project_id = bq_config["project-id"]
     dataset = bq_config["dataset"]
     table_prefix = bq_config["table-prefix"]
-    destination_table = f"{dataset}.{table_prefix}"
     
-    logger.log(f"Iniciando subida de {df.shape[0]} filas a: {project_id}.{destination_table}")
-    
-    try:
-        credentials_gbq = service_account.Credentials.from_service_account_info(credentials_info)
-        to_gbq(
-            dataframe=df, destination_table=destination_table, project_id=project_id,
-            credentials=credentials_gbq, if_exists="append", table_schema=schema,
-            progress_bar=False, api_method='load_csv'
-        )
-        logger.log("Subida a BQ completada.")
+    credentials_gbq = service_account.Credentials.from_service_account_info(credentials_info)
+
+    # Iterar por cada fecha única en el DataFrame
+    unique_dates = df['date'].dt.date.unique()
+    logger.log(f"Se encontraron {len(unique_dates)} fechas únicas para procesar.")
+
+    for single_date in unique_dates:
+        # Formatear la fecha para el sufijo de la tabla (ej. 20250613)
+        date_suffix = single_date.strftime('%Y%m%d')
+        destination_table_name = f"{table_prefix}_{date_suffix}"
+        full_destination_table = f"{dataset}.{destination_table_name}"
+        
+        # Filtrar el DataFrame para obtener solo los datos de este día
+        df_for_day = df[df['date'].dt.date == single_date].copy()
+
+        # Antes de subir, formateamos la columna 'date' a string para evitar errores
+        df_for_day['date'] = df_for_day['date'].dt.strftime('%Y-%m-%d')
+        
+        logger.log(f"Subiendo {len(df_for_day)} filas para la fecha {single_date.strftime('%Y-%m-%d')} a la tabla {full_destination_table}")
 
         try:
-            bq_client = bigquery.Client(project=project_id, credentials=credentials_gbq)
-            table_ref = bq_client.get_table(destination_table)
-            table_ref.expires = datetime.utcnow() + timedelta(days=1096)
-            bq_client.update_table(table_ref, ["expires"])
-            logger.log("Expiración de tabla actualizada.")
-        except Exception as e_expires:
-            logger.log(f"ADVERTENCIA: No se pudo actualizar expiración. Error: {e_expires}")
-    except Exception as e_upload:
-        logger.critical(f"Error subiendo datos a BQ con to_gbq: {e_upload}")
-        raise
+            to_gbq(
+                dataframe=df_for_day,
+                destination_table=full_destination_table,
+                project_id=project_id,
+                credentials=credentials_gbq,
+                if_exists='replace',  # REEMPLAZA la tabla del día si ya existe, evitando duplicados
+                table_schema=schema,
+                api_method='load_csv'
+            )
+            logger.log(f"Carga para el día {date_suffix} completada exitosamente.")
+
+            # Opcional: Setear expiración para cada tabla diaria
+            try:
+                bq_client = bigquery.Client(project=project_id, credentials=credentials_gbq)
+                table_ref = bq_client.get_table(full_destination_table)
+                table_ref.expires = datetime.utcnow() + timedelta(days=1096)
+                bq_client.update_table(table_ref, ["expires"])
+            except Exception as e_expires:
+                 logger.log(f"ADVERTENCIA: No se pudo actualizar expiración para {full_destination_table}. Error: {e_expires}")
+
+        except Exception as e:
+            # Si un día falla, registramos el error y continuamos con el siguiente
+            logger.critical(f"FALLO la carga para el día {date_suffix}. Error: {e}")
+            continue
