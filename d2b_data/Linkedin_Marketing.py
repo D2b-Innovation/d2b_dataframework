@@ -1,3 +1,5 @@
+# Pega este código completo en tu archivo d2b_data/Linkedin_Marketing.py
+
 import pandas as pd
 import json
 import requests
@@ -7,8 +9,6 @@ from pandas_gbq import to_gbq
 from google.cloud import bigquery
 from google.oauth2 import service_account
 from datetime import datetime, timedelta
-
-# NOTA: La importación de Verbose y Google_Bigquery no son necesarias en este archivo.
 
 class Linkedin_Marketing():
   def __init__(self, APPLICATON_KEY, APPLICATON_SECRET):
@@ -22,9 +22,6 @@ class Linkedin_Marketing():
     self.token             = None
     self.verbose_logger    = None
 
-  def get_url(self):
-    return self.OAUTH_URL
-
   def set_headers_token(self, token_header):
     headers = CaseInsensitiveDict()
     headers["Accept"] = "application/json"
@@ -32,7 +29,7 @@ class Linkedin_Marketing():
     self.HEADERS = headers
     return self.HEADERS
 
-  def get_token(self, code=None, filename=None):
+  def get_token(self, filename=None):
     if filename is not None and exists(filename):
       with open(filename) as json_file:
         json_content = json.load(json_file)
@@ -41,208 +38,94 @@ class Linkedin_Marketing():
       if self.verbose_logger:
         self.verbose_logger.log("Token cargado desde archivo")
       return self.HEADERS
+    raise ValueError(f"No se pudo obtener el token desde el archivo: {filename}")
 
-    url_token_endpoint = "https://www.linkedin.com/oauth/v2/accessToken"
-    headers = CaseInsensitiveDict()
-    params = CaseInsensitiveDict()
-    headers["Content-Type"] = "application/x-www-form-urlencoded"
-    params["grant_type"]    = "authorization_code"
-    params["code"]          = f"{code}"
-    params["redirect_uri"]  = f"{self.RETURN_URL}"
-    params["client_id"]     = f"{self.APPLICATON_KEY}"
-    params["client_secret"] = f"{self.APPLICATON_SECRET}"
-    res_token = requests.post(url_token_endpoint, params=params, headers=headers)
-    
-    if res_token.status_code != 200 or "error" in res_token.json():
-        raise ValueError(f"Error getting token: {res_token.content.decode()}")
-    
-    json_token = res_token.json()
-    self.token = json_token.get('access_token')
-    
-    if self.token:
-        if filename is not None:
-            with open(filename, 'w') as f:
-                json.dump(json_token, f)
-        self.set_headers_token(self.token)
-        if self.verbose_logger:
-            self.verbose_logger.log("Nuevo token obtenido desde API")
-    else:
-      raise ValueError(f'Error getting token: No se encontró access_token en la respuesta: {res_token.content.decode()}')
-    return self.token
-
-  # (MEJORA) Se añaden 'pivot' y 'time_granularity' como parámetros
-  def get_report(self, account_id, start, end, metrics, pivot="CAMPAIGN", time_granularity="DAILY"):
-    """
-    Construye y ejecuta la llamada a la API de adAnalyticsV2, incluyendo los pivots.
-    """
+  def get_report(self, account_id, start, end, metrics, pivot=None, time_granularity="DAILY"):
     account_id_encoded = f"urn%3Ali%3AsponsoredAccount%3A{account_id}"
-
-    # Formateo de fechas
     start_parts = start.split("-")
     end_parts   = end.split("-")
     start_url = f"&dateRange.start.day={start_parts[2]}&dateRange.start.month={start_parts[1]}&dateRange.start.year={start_parts[0]}"
     end_url   = f"&dateRange.end.day={end_parts[2]}&dateRange.end.month={end_parts[1]}&dateRange.end.year={end_parts[0]}"
     
-    # IMPORTANTE: Si usamos pivot, debemos pedir los campos 'pivot' y 'pivotValues'
     if pivot and "pivot" not in metrics:
         metrics += ",pivot,pivotValues"
     
-    # Construcción dinámica de los pivots en la URL
     pivot_text = ''
     if pivot:
-      # Esto permite múltiples pivots separados por comas, ej: "CAMPAIGN_GROUP,CAMPAIGN"
       for idx, val in enumerate(pivot.split(",")):
         pivot_text += f"pivots[{idx}]={val.strip()}&"
 
-    # Construcción de la URL final
-    url = (
-        f'https://api.linkedin.com/v2/adAnalyticsV2?q=statistics&{pivot_text}'
-        f'timeGranularity={time_granularity}{start_url}{end_url}&accounts={account_id_encoded}&fields={metrics}'
-    )
+    url = (f'https://api.linkedin.com/v2/adAnalyticsV2?q=statistics&{pivot_text}'
+           f'timeGranularity={time_granularity}{start_url}{end_url}&accounts={account_id_encoded}&fields={metrics}')
     
-    if self.verbose_logger:
-        self.verbose_logger.log(f"Ejecutando GET a URL de LinkedIn: {url}")
+    if self.verbose_logger: self.verbose_logger.log(f"Ejecutando GET a URL de LinkedIn: {url}")
         
     res = requests.get(url, headers=self.HEADERS)
     if res.status_code != 200:
         error_content = res.content.decode()
-        if self.verbose_logger:
-            self.verbose_logger.log(f"Error en respuesta de API: {res.status_code} - {error_content}")
+        if self.verbose_logger: self.verbose_logger.log(f"Error en respuesta de API: {res.status_code} - {error_content}")
         raise Exception(f"Error en API de LinkedIn: {error_content}")
-        
     return res.content
 
-  def _clean_and_transform_dataFrame(self, res, date_str=None):
-    # 1. Decodificar y normalizar la respuesta JSON
-    if isinstance(res, bytes):
-        res = json.loads(res.decode("utf-8"))
-    DF = pd.json_normalize(res.get("elements"), sep="_")
-
-    if DF.empty:
-        return DF
-
-    # 2. Limpieza genérica y esencial
-    
-    # Asegurar que la columna 'date' se cree y sea de tipo fecha
-    if date_str:
-        DF["date"] = date_str
-    
-    if "date" in DF.columns:
-        # DEBE QUEDAR ASÍ: solo con to_datetime para que sea un objeto datetime completo
-        DF["date"] = pd.to_datetime(DF["date"])
-
-    # Aplanar cualquier columna con JSON anidado (como 'adentities')
-    if 'adentities' in DF.columns:
-        DF['adentities'] = DF['adentities'].apply(lambda x: json.dumps(x) if pd.notna(x) else None)
-
-    # Limpiar nombres de columnas a un formato estándar
-    DF.columns = (
-        DF.columns
-        .str.strip()
-        .str.lower()
-        .str.replace(" ", "_", regex=False)
-        .str.replace("-", "_", regex=False)
-        .str.replace(r"[^\w]", "", regex=True)
-    )
-    
-    self.verbose_logger.log(f"DataFrame crudo pero limpio generado. Columnas: {DF.columns.tolist()}")
-    return DF
-  
   def get_report_dataframe(self, account_id, start, end, metrics, unsampled=False, **kwargs):
-      # **kwargs permite pasar parámetros opcionales como 'pivot' a get_report
-      if unsampled:
-          if self.verbose_logger:
-              self.verbose_logger.log("Extracción UNSAMPLED activada")
-          date_range = pd.date_range(start, end, freq='D')
-          array_reports = []
+    if unsampled:
+        date_range = pd.date_range(start, end, freq='D')
+        array_reports = []
+        for date in date_range:
+            date_str = date.strftime('%Y-%m-%d')
+            res = self.get_report(account_id, date_str, date_str, metrics, **kwargs)
+            df = self._clean_and_transform_dataFrame(res, date_str=date_str)
+            if not df.empty: array_reports.append(df)
+        return pd.concat(array_reports, ignore_index=True) if array_reports else pd.DataFrame()
+    else:
+        res = self.get_report(account_id, start, end, metrics, **kwargs)
+        return self._clean_and_transform_dataFrame(res)
 
-          for date in date_range:
-              date_str = date.strftime('%Y-%m-%d')
-              if self.verbose_logger:
-                  self.verbose_logger.log(f"Extrayendo fecha {date_str}")
-              
-              res = self.get_report(account_id, date_str, date_str, metrics, **kwargs)
-              df = self._clean_and_transform_dataFrame(res, date_str=date_str)
-              
-              if not df.empty:
-                  self.verbose_logger.log(f"DataFrame para {date_str} con shape: {df.shape}")
-                  array_reports.append(df)
+  def _clean_and_transform_dataFrame(self, res, date_str=None):
+    if isinstance(res, bytes): res = json.loads(res.decode("utf-8"))
+    DF = pd.json_normalize(res.get("elements"), sep="_")
+    if DF.empty: return DF
 
-          if not array_reports:
-              return pd.DataFrame() # Devuelve DF vacío si no se extrajo nada
-          return pd.concat(array_reports, ignore_index=True)
+    if date_str: DF["date"] = date_str
+    if "date" in DF.columns: DF["date"] = pd.to_datetime(DF["date"])
 
-      else:
-          if self.verbose_logger:
-              self.verbose_logger.log("Extracción con un solo llamado (sampled)")
-          
-          res = self.get_report(account_id, start, end, metrics, **kwargs)
-          return self.clean_and_transform_dataFrame(res)
-    
+    if 'adentities' in DF.columns: DF['adentities'] = DF['adentities'].apply(lambda x: json.dumps(x) if pd.notna(x) else None)
+
+    DF.columns = (DF.columns.str.strip().str.lower().str.replace(" ", "_", regex=False).str.replace("-", "_", regex=False).str.replace(r"[^\w]", "", regex=True))
+    if self.verbose_logger: self.verbose_logger.log(f"DataFrame crudo pero limpio generado. Columnas: {DF.columns.tolist()}")
+    return DF
+
   def upload_to_bigquery(self, df, bq_config, credentials_info, schema):
-    """
-    Sube un DataFrame a una tabla particionada en BigQuery y luego setea su expiración.
-    """
     logger = self.verbose_logger
     if df.empty:
         logger.log("DataFrame vacío, no se sube nada a BigQuery.")
         return
 
-    if "date" not in df.columns:
-        msg = "Columna 'date' ausente en el DataFrame. No se puede subir a tabla particionada."
-        logger.critical(msg)
-        raise ValueError(msg)
-
-    # Asegurarse que la columna de particionamiento es de tipo correcto
-    df["date"] = pd.to_datetime(df["date"])
-
-    table_prefix = bq_config["table-prefix"]
-    dataset = bq_config["dataset"]
     project_id = bq_config["project-id"]
+    dataset = bq_config["dataset"]
+    table_prefix = bq_config["table-prefix"]
     destination_table = f"{dataset}.{table_prefix}"
-    full_table_id = f"{project_id}.{dataset}.{table_prefix}"
     
-    logger.log(f"Iniciando subida de {df.shape[0]} filas a la tabla particionada: {full_table_id}")
-
+    logger.log(f"Iniciando subida de {df.shape[0]} filas a la tabla particionada: {project_id}.{destination_table}")
+    
     try:
-        # 1. CARGAR LOS DATOS
         credentials_gbq = service_account.Credentials.from_service_account_info(credentials_info)
         to_gbq(
-            dataframe=df,
-            destination_table=destination_table,
-            project_id=project_id,
-            credentials=credentials_gbq,
-            if_exists="append",
-            table_schema=schema,
-            progress_bar=False,
-            api_method='load_csv'
+            dataframe=df, destination_table=destination_table, project_id=project_id,
+            credentials=credentials_gbq, if_exists="append", table_schema=schema,
+            progress_bar=False, api_method='load_csv'
         )
-        logger.log(f"Subida a {full_table_id} completada exitosamente.")
+        logger.log("Subida a BigQuery completada exitosamente.")
 
-        # --- SETEAR EXPIRACIÓN ---
-        # 2. Una vez que la carga es exitosa, se actualiza la expiración de la tabla.
         try:
-            logger.log(f"Actualizando la expiración para la tabla {full_table_id}...")
-            
-            # Crear un cliente de BigQuery para operaciones de metadatos
             bq_client = bigquery.Client(project=project_id, credentials=credentials_gbq)
-            
-            # Obtener la referencia de la tabla
             table_ref = bq_client.get_table(destination_table)
-            
-            # Calcular la nueva fecha de expiración (aprox. 3 años)
             expiration_date = datetime.utcnow() + timedelta(days=1096)
             table_ref.expires = expiration_date
-            
-            # Actualizar la tabla en BigQuery, especificando que solo se cambia la expiración
             bq_client.update_table(table_ref, ["expires"])
-            
-            logger.log(f"Expiración para la tabla {full_table_id} actualizada a {expiration_date.strftime('%Y-%m-%d')}.")
-
+            logger.log("Expiración de la tabla actualizada.")
         except Exception as e_expires:
-            # Si falla, no es un error crítico. Solo loguear una advertencia.
-            logger.log(f"ADVERTENCIA: No se pudo actualizar la expiración para la tabla {full_table_id}. Error: {e_expires}")
-
+            logger.log(f"ADVERTENCIA: No se pudo actualizar la expiración. Error: {e_expires}")
     except Exception as e_upload:
         logger.critical(f"Error subiendo datos a BigQuery con to_gbq: {e_upload}")
-        raise # Volvemos a lanzar la excepción para que la Cloud Function falle y alerte
+        raise
