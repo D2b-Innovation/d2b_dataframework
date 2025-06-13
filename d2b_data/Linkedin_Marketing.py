@@ -115,10 +115,8 @@ class Linkedin_Marketing():
         DF["date"] = date_str
     
     if "date" in DF.columns:
-        # --- LA SOLUCIÓN ESTÁ AQUÍ ---
-        # 1. Convertimos a datetime completo para manejar cualquier formato de entrada.
-        # 2. Usamos .dt.date para descartar la parte de la hora.
-        DF["date"] = pd.to_datetime(DF["date"]).dt.date
+        # DEBE QUEDAR ASÍ: solo con to_datetime para que sea un objeto datetime completo
+        DF["date"] = pd.to_datetime(DF["date"])
 
     # Aplanar cualquier columna con JSON anidado (como 'adentities')
     if 'adentities' in DF.columns:
