@@ -91,40 +91,34 @@ class Linkedin_Marketing():
       raise Exception(res.content)
     return res.content
 
-  def _clean_and_transform_dataFrame(self, res, verbose_logger, date_str=None):
-    # Asegurarse de que `res` sea un dict (puede venir como string o bytes)
+  def _clean_and_transform_dataFrame(self, res, date_str=None):
     if isinstance(res, bytes):
-        verbose_logger.log("Decodificando respuesta desde bytes.")
+        self.verbose_logger.log("Decodificando respuesta desde bytes.")
         res = json.loads(res.decode("utf-8"))
     elif isinstance(res, str):
-        verbose_logger.log("Decodificando respuesta desde string.")
+        self.verbose_logger.log("Decodificando respuesta desde string.")
         res = json.loads(res)
 
-    verbose_logger.log("Normalizando respuesta JSON.")
+    self.verbose_logger.log("Normalizando respuesta JSON.")
     DF = pd.json_normalize(res.get("elements"), sep="_")
 
     if date_str:
-        verbose_logger.log(f"Asignando columna 'date' con valor: {date_str}")
+        self.verbose_logger.log(f"Asignando columna 'date' con valor: {date_str}")
         DF["date"] = date_str
 
-    # Aplanar columnas y limpiar otras fechas
     date_cols = [
-        "daterange_end_day",
-        "daterange_end_month",
-        "daterange_end_year",
-        "daterange_start_day",
-        "daterange_start_month",
-        "daterange_start_year"
+        "dateRange.start.month", "dateRange.start.day", "dateRange.start.year",
+        "dateRange.end.month", "dateRange.end.day", "dateRange.end.year"
     ]
     for col in date_cols:
         if col in DF.columns:
-            verbose_logger.log(f"Eliminando columna innecesaria: {col}")
+            self.verbose_logger.log(f"Eliminando columna innecesaria: {col}")
             DF.drop(columns=col, inplace=True)
 
-    verbose_logger.log("Normalizando nombres de columnas a minúsculas.")
+    self.verbose_logger.log("Normalizando nombres de columnas a minúsculas.")
     DF.columns = [x.lower() for x in DF.columns]
 
-    verbose_logger.log(f"DataFrame limpio con shape final: {DF.shape}")
+    self.verbose_logger.log(f"DataFrame limpio con shape final: {DF.shape}")
     return DF
 
   def get_report_dataframe(self, account_id, start, end, metrics, unsampled=False):
@@ -147,7 +141,8 @@ class Linkedin_Marketing():
                   res = json.loads(res)
 
               # Solo pasamos `date_str`, el método se encarga de agregarlo al DF
-              df = self._clean_and_transform_dataFrame(res, date_str=date_str)
+              df = self._clean_and_transform_dataFrame(res, verbose_logger, date_str=date_str)
+              self.verbose_logger.log(f"DataFrame para {date_str} con shape: {df.shape}")
               array_reports.append(df)
 
           return pd.concat(array_reports)
