@@ -71,32 +71,45 @@ class Linkedin_Marketing():
     return self.token
 
   # (MEJORA) Se añaden 'pivot' y 'time_granularity' como parámetros
-  def get_report(self, account_id, start, end, metrics, pivot="CAMPAIGN_GROUP,CAMPAIGN", time_granularity="DAILY"):
-    account_id = f"urn%3Ali%3AsponsoredAccount%3A{account_id}"
+  def get_report(self, account_id, start, end, metrics, pivot="CAMPAIGN", time_granularity="DAILY"):
+    """
+    Construye y ejecuta la llamada a la API de adAnalyticsV2, incluyendo los pivots.
+    """
+    account_id_encoded = f"urn%3Ali%3AsponsoredAccount%3A{account_id}"
 
+    # Formateo de fechas
     start_parts = start.split("-")
     end_parts   = end.split("-")
     start_url = f"&dateRange.start.day={start_parts[2]}&dateRange.start.month={start_parts[1]}&dateRange.start.year={start_parts[0]}"
     end_url   = f"&dateRange.end.day={end_parts[2]}&dateRange.end.month={end_parts[1]}&dateRange.end.year={end_parts[0]}"
     
-    metrics = metrics + ",pivot,pivotValues"
+    # IMPORTANTE: Si usamos pivot, debemos pedir los campos 'pivot' y 'pivotValues'
+    if pivot and "pivot" not in metrics:
+        metrics += ",pivot,pivotValues"
     
+    # Construcción dinámica de los pivots en la URL
     pivot_text = ''
     if pivot:
-      # Permite múltiples pivots separados por comas, ej: "CREATIVE,CAMPAIGN"
+      # Esto permite múltiples pivots separados por comas, ej: "CAMPAIGN_GROUP,CAMPAIGN"
       for idx, val in enumerate(pivot.split(",")):
-        pivot_text += f"pivots[{idx}]={val}&"
+        pivot_text += f"pivots[{idx}]={val.strip()}&"
 
-    url = f'https://api.linkedin.com/v2/adAnalyticsV2?q=statistics&{pivot_text}timeGranularity={time_granularity}{start_url}{end_url}&accounts={account_id}&fields={metrics}'
+    # Construcción de la URL final
+    url = (
+        f'https://api.linkedin.com/v2/adAnalyticsV2?q=statistics&{pivot_text}'
+        f'timeGranularity={time_granularity}{start_url}{end_url}&accounts={account_id_encoded}&fields={metrics}'
+    )
     
     if self.verbose_logger:
         self.verbose_logger.log(f"Ejecutando GET a URL de LinkedIn: {url}")
         
     res = requests.get(url, headers=self.HEADERS)
     if res.status_code != 200:
-      if self.verbose_logger:
-        self.verbose_logger.log(f"Error en respuesta de API: {res.status_code} - {res.content.decode()}")
-      raise Exception(res.content)
+        error_content = res.content.decode()
+        if self.verbose_logger:
+            self.verbose_logger.log(f"Error en respuesta de API: {res.status_code} - {error_content}")
+        raise Exception(f"Error en API de LinkedIn: {error_content}")
+        
     return res.content
 
   def _clean_and_transform_dataFrame(self, res, date_str=None):
