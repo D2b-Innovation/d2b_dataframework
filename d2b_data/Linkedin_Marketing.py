@@ -107,9 +107,10 @@ class Linkedin_Marketing():
         DF["date"] = date_str
 
     date_cols = [
-        "dateRange.start.month", "dateRange.start.day", "dateRange.start.year",
-        "dateRange.end.month", "dateRange.end.day", "dateRange.end.year"
+        "daterange_start_month", "daterange_start_day", "daterange_start_year",
+        "daterange_end_month", "daterange_end_day", "daterange_end_year"
     ]
+
     for col in date_cols:
         if col in DF.columns:
             self.verbose_logger.log(f"Eliminando columna innecesaria: {col}")
@@ -189,13 +190,12 @@ class Linkedin_Marketing():
     dataset = bq_config["dataset"]
     project_id = bq_config["project-id"]
 
-    text_date_suffix = date_str.replace("-", "")
-    table_id_suffix = f"{table_prefix}_{text_date_suffix}"
-    full_table = f"{dataset}.{table_id_suffix}"
-
     client = bigquery.Client(project=project_id, credentials=service_account.Credentials.from_service_account_info(credentials_info))
 
     for date_str in df["date"].unique():
+        text_date_suffix = date_str.replace("-", "")
+        table_id_suffix = f"{table_prefix}_{text_date_suffix}"
+        full_table = f"{dataset}.{table_id_suffix}"
         iter_df = df[df["date"] == date_str].copy()
         logger.log(f"Subiendo {iter_df.shape[0]} filas para fecha {date_str} a tabla {full_table}")
 
@@ -209,7 +209,7 @@ class Linkedin_Marketing():
                 table_schema=schema
             )
             # Set expiración
-            table_ref = client.dataset(dataset).table(table_prefix)
+            table_ref = client.dataset(dataset).table(table_id_suffix)
             table_obj = client.get_table(table_ref)
             table_obj.expires = datetime.utcnow() + timedelta(days=1096)
             client.update_table(table_obj, ["expires"])
