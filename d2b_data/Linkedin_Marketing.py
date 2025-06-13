@@ -3,12 +3,12 @@ import json
 import requests
 from os.path import exists
 from requests.structures import CaseInsensitiveDict
-from d2b_data.verbose_logger import Verbose  
-from d2b_data.Google_Bigquery import Google_Bigquery
 from pandas_gbq import to_gbq
 from google.cloud import bigquery
 from google.oauth2 import service_account
 from datetime import datetime, timedelta
+
+# NOTA: La importación de Verbose y Google_Bigquery no son necesarias en este archivo.
 
 class Linkedin_Marketing():
   def __init__(self, APPLICATON_KEY, APPLICATON_SECRET):
@@ -20,7 +20,7 @@ class Linkedin_Marketing():
     self.OAUTH_URL         = f'https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id={self.APPLICATON_KEY}&redirect_uri={self.RETURN_URL}&state=foobar&scope={self.SCOPE_str}'
     self.HEADERS           = None
     self.token             = None
-    self.verbose_logger    = None  # ← Logger personalizado, instanciable desde afuera
+    self.verbose_logger    = None
 
   def get_url(self):
     return self.OAUTH_URL
@@ -52,77 +52,101 @@ class Linkedin_Marketing():
     params["client_id"]     = f"{self.APPLICATON_KEY}"
     params["client_secret"] = f"{self.APPLICATON_SECRET}"
     res_token = requests.post(url_token_endpoint, params=params, headers=headers)
-    if json.loads(res_token.content).get("error", None) is not None:
-      raise ValueError('Error getting token: ' + str(res_token.content))
     
-    json_token = json.loads(res_token.content)
-    if json_token.get('access_token', False):
-      if filename is not None:
-        with open(filename, 'w') as f:
-          json.dump(json_token, f)
-      self.token = json_token.get('access_token')
-      self.set_headers_token(self.token)
-      if self.verbose_logger:
-        self.verbose_logger.log("Nuevo token obtenido desde API")
+    if res_token.status_code != 200 or "error" in res_token.json():
+        raise ValueError(f"Error getting token: {res_token.content.decode()}")
+    
+    json_token = res_token.json()
+    self.token = json_token.get('access_token')
+    
+    if self.token:
+        if filename is not None:
+            with open(filename, 'w') as f:
+                json.dump(json_token, f)
+        self.set_headers_token(self.token)
+        if self.verbose_logger:
+            self.verbose_logger.log("Nuevo token obtenido desde API")
     else:
-      raise ValueError('Error getting token:' + res_token.content.decode())
+      raise ValueError(f'Error getting token: No se encontró access_token en la respuesta: {res_token.content.decode()}')
     return self.token
 
-  def get_report(self, account_id, start, end, metrics):
-    pivot = "CREATIVE"
-    time = "DAILY"
+  # (MEJORA) Se añaden 'pivot' y 'time_granularity' como parámetros
+  def get_report(self, account_id, start, end, metrics, pivot="CREATIVE", time_granularity="DAILY"):
     account_id = f"urn%3Ali%3AsponsoredAccount%3A{account_id}"
 
-    start = start.split("-")
-    end   = end.split("-")
-    start = f"&dateRange.start.day={start[2]}&dateRange.start.month={start[1]}&dateRange.start.year={start[0]}"
-    end   = f"&dateRange.end.day={end[2]}&dateRange.end.month={end[1]}&dateRange.end.year={end[0]}"
+    start_parts = start.split("-")
+    end_parts   = end.split("-")
+    start_url = f"&dateRange.start.day={start_parts[2]}&dateRange.start.month={start_parts[1]}&dateRange.start.year={start_parts[0]}"
+    end_url   = f"&dateRange.end.day={end_parts[2]}&dateRange.end.month={end_parts[1]}&dateRange.end.year={end_parts[0]}"
+    
     metrics = metrics + ",pivot,pivotValues"
-    text = ''
+    
+    pivot_text = ''
     if pivot:
+      # Permite múltiples pivots separados por comas, ej: "CREATIVE,CAMPAIGN"
       for idx, val in enumerate(pivot.split(",")):
-        text += f"pivots[{idx}]={val}&"
+        pivot_text += f"pivots[{idx}]={val}&"
 
-    url = f'https://api.linkedin.com/v2/adAnalyticsV2?q=statistics&{text}&timeGranularity={time}&{start}{end}&accounts={account_id}&fields={metrics}'
+    url = f'https://api.linkedin.com/v2/adAnalyticsV2?q=statistics&{pivot_text}timeGranularity={time_granularity}{start_url}{end_url}&accounts={account_id}&fields={metrics}'
+    
+    if self.verbose_logger:
+        self.verbose_logger.log(f"Ejecutando GET a URL de LinkedIn: {url}")
+        
     res = requests.get(url, headers=self.HEADERS)
     if res.status_code != 200:
       if self.verbose_logger:
-        self.verbose_logger.log(f"Error en respuesta de API: {res.status_code} - {res.content}")
+        self.verbose_logger.log(f"Error en respuesta de API: {res.status_code} - {res.content.decode()}")
       raise Exception(res.content)
     return res.content
 
   def _clean_and_transform_dataFrame(self, res, date_str=None):
     if isinstance(res, bytes):
-        self.verbose_logger.log("Decodificando respuesta desde bytes.")
         res = json.loads(res.decode("utf-8"))
     elif isinstance(res, str):
-        self.verbose_logger.log("Decodificando respuesta desde string.")
         res = json.loads(res)
 
-    self.verbose_logger.log("Normalizando respuesta JSON.")
+    if self.verbose_logger:
+        self.verbose_logger.log("Normalizando respuesta JSON.")
+    
     DF = pd.json_normalize(res.get("elements"), sep="_")
 
+    if DF.empty:
+        if self.verbose_logger:
+            self.verbose_logger.log("DataFrame vacío después de normalizar JSON.")
+        return DF
+
     if date_str:
-        self.verbose_logger.log(f"Asignando columna 'date' con valor: {date_str}")
         DF["date"] = date_str
+    elif "daterange_start_year" in DF.columns and "daterange_start_month" in DF.columns and "daterange_start_day" in DF.columns:
+        date_df = DF[["daterange_start_year", "daterange_start_month", "daterange_start_day"]].copy()
+        date_df.columns = ["year", "month", "day"]
+        DF["date"] = pd.to_datetime(date_df)
+    else:
+        if self.verbose_logger:
+            self.verbose_logger.log("Advertencia: No se encontró 'date_str' ni columnas 'daterange' para crear la columna 'date'.")
 
-    date_cols = [
-        "daterange_start_month", "daterange_start_day", "daterange_start_year",
-        "daterange_end_month", "daterange_end_day", "daterange_end_year"
-    ]
+    date_cols_to_drop = ["daterange_start_month", "daterange_start_day", "daterange_start_year", "daterange_end_month", "daterange_end_day", "daterange_end_year"]
+    cols_to_drop_existing = [col for col in date_cols_to_drop if col in DF.columns]
+    if cols_to_drop_existing:
+        DF.drop(columns=cols_to_drop_existing, inplace=True)
 
-    for col in date_cols:
-        if col in DF.columns:
-            self.verbose_logger.log(f"Eliminando columna innecesaria: {col}")
-            DF.drop(columns=col, inplace=True)
+    # (MEJORA) Consolidar toda la limpieza de columnas aquí para mayor consistencia
+    DF.columns = (
+        DF.columns
+        .str.strip()
+        .str.lower()
+        .str.replace(" ", "_", regex=False)
+        .str.replace("-", "_", regex=False)
+        .str.replace(r"[^\w]", "", regex=True)
+    )
 
-    self.verbose_logger.log("Normalizando nombres de columnas a minúsculas.")
-    DF.columns = [x.lower() for x in DF.columns]
-
-    self.verbose_logger.log(f"DataFrame limpio con shape final: {DF.shape}")
+    if self.verbose_logger:
+        self.verbose_logger.log(f"DataFrame limpio con shape final: {DF.shape}")
     return DF
 
-  def get_report_dataframe(self, account_id, start, end, metrics, unsampled=False):
+  # (MEJORA) Se elimina la doble decodificación de JSON
+  def get_report_dataframe(self, account_id, start, end, metrics, unsampled=False, **kwargs):
+      # **kwargs permite pasar parámetros opcionales como 'pivot' a get_report
       if unsampled:
           if self.verbose_logger:
               self.verbose_logger.log("Extracción UNSAMPLED activada")
@@ -133,90 +157,59 @@ class Linkedin_Marketing():
               date_str = date.strftime('%Y-%m-%d')
               if self.verbose_logger:
                   self.verbose_logger.log(f"Extrayendo fecha {date_str}")
-              res = self.get_report(account_id, date_str, date_str, metrics)
-
-              # Decodificar si es necesario
-              if isinstance(res, bytes):
-                  res = json.loads(res.decode("utf-8"))
-              elif isinstance(res, str):
-                  res = json.loads(res)
-
-              # Solo pasamos `date_str`, el método se encarga de agregarlo al DF
+              
+              res = self.get_report(account_id, date_str, date_str, metrics, **kwargs)
               df = self._clean_and_transform_dataFrame(res, date_str=date_str)
-              self.verbose_logger.log(f"DataFrame para {date_str} con shape: {df.shape}")
-              array_reports.append(df)
+              
+              if not df.empty:
+                  self.verbose_logger.log(f"DataFrame para {date_str} con shape: {df.shape}")
+                  array_reports.append(df)
 
-          return pd.concat(array_reports)
+          if not array_reports:
+              return pd.DataFrame() # Devuelve DF vacío si no se extrajo nada
+          return pd.concat(array_reports, ignore_index=True)
 
       else:
           if self.verbose_logger:
               self.verbose_logger.log("Extracción con un solo llamado (sampled)")
-          res = self.get_report(account_id, start, end, metrics)
-
-          # Decodificar si es necesario
-          if isinstance(res, bytes):
-              res = json.loads(res.decode("utf-8"))
-          elif isinstance(res, str):
-              res = json.loads(res)
-
-          res = self._clean_and_transform_dataFrame(res)
-          return res
+          
+          res = self.get_report(account_id, start, end, metrics, **kwargs)
+          return self.clean_and_transform_dataFrame(res)
     
-  def upload_to_bigquery_by_day(self, df, bq_config, credentials_info, schema, workflow_name="linkedin-cloud"):
-    """
-    Sube el DataFrame de LinkedIn Ads a una única tabla en BigQuery, escribiendo una partición por día.
-
-    Args:
-        df (pd.DataFrame): DataFrame con columna 'date'.
-        bq_config (dict): Contiene dataset, project-id y table-prefix.
-        credentials_info (dict): SA como dict para autenticación.
-        schema (list): Lista de dicts con 'name', 'type' y 'description' para schema de tabla.
-        workflow_name (str): Nombre del flujo para logs.
-    """
+  # (MEJORA) Se elimina la variable 'table_config' y se apaga el progress_bar
+  def upload_to_bigquery(self, df, bq_config, credentials_info, schema):
     logger = self.verbose_logger
     if df.empty:
-        msg = "DataFrame vacío, no se sube nada a BigQuery."
-        logger.critical(msg, workflow_name)
-        raise ValueError(msg)
+        logger.log("DataFrame vacío, no se sube nada a BigQuery.")
+        return
 
     if "date" not in df.columns:
-        msg = "Columna 'date' ausente en el DataFrame."
-        logger.critical(msg, workflow_name)
+        msg = "Columna 'date' ausente en el DataFrame. No se puede subir a tabla particionada."
+        logger.critical(msg)
         raise ValueError(msg)
 
-    df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+    df["date"] = pd.to_datetime(df["date"])
 
     table_prefix = bq_config["table-prefix"]
     dataset = bq_config["dataset"]
     project_id = bq_config["project-id"]
+    full_table_id = f"{project_id}.{dataset}.{table_prefix}"
+    
+    logger.log(f"Iniciando subida de {df.shape[0]} filas a la tabla particionada: {full_table_id}")
 
-    client = bigquery.Client(project=project_id, credentials=service_account.Credentials.from_service_account_info(credentials_info))
+    try:
+        to_gbq(
+            dataframe=df,
+            destination_table=f"{dataset}.{table_prefix}",
+            project_id=project_id,
+            credentials=service_account.Credentials.from_service_account_info(credentials_info),
+            if_exists="append",
+            table_schema=schema,
+            progress_bar=False, # Mejor para entornos automatizados
+            api_method='load_csv'
+        )
+        logger.log(f"Subida a {full_table_id} completada exitosamente.")
 
-    for date_str in df["date"].unique():
-        text_date_suffix = date_str.replace("-", "")
-        table_id_suffix = f"{table_prefix}_{text_date_suffix}"
-        full_table = f"{dataset}.{table_id_suffix}"
-        iter_df = df[df["date"] == date_str].copy()
-        logger.log(f"Subiendo {iter_df.shape[0]} filas para fecha {date_str} a tabla {full_table}")
-
-        try:
-            to_gbq(
-                dataframe=iter_df,
-                destination_table=full_table,
-                project_id=project_id,
-                credentials=client._credentials,
-                if_exists="replace",
-                table_schema=schema
-            )
-            # Set expiración
-            table_ref = client.dataset(dataset).table(table_id_suffix)
-            table_obj = client.get_table(table_ref)
-            table_obj.expires = datetime.utcnow() + timedelta(days=1096)
-            client.update_table(table_obj, ["expires"])
-
-            logger.log(f"Fecha {date_str} cargada exitosamente a {full_table} y expiración actualizada.")
-        except Exception as e:
-            logger.critical(f"Error subiendo {date_str} a {full_table}: {e}", workflow_name)
-            continue
-
-    logger.log(f"Proceso finalizado para {len(df['date'].unique())} fechas en tabla única particionada.")
+    except Exception as e:
+        logger.critical(f"Error subiendo datos a BigQuery con to_gbq: {e}")
+        raise
