@@ -141,7 +141,7 @@ class Linkedin_Marketing():
                   res = json.loads(res)
 
               # Solo pasamos `date_str`, el método se encarga de agregarlo al DF
-              df = self._clean_and_transform_dataFrame(res, verbose_logger, date_str=date_str)
+              df = self._clean_and_transform_dataFrame(res, date_str=date_str)
               self.verbose_logger.log(f"DataFrame para {date_str} con shape: {df.shape}")
               array_reports.append(df)
 
