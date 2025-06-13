@@ -183,7 +183,9 @@ class Linkedin_Marketing():
     dataset = bq_config["dataset"]
     project_id = bq_config["project-id"]
 
-    full_table = f"{dataset}.{table_prefix}"
+    text_date_suffix = date_str.replace("-", "")
+    table_id_suffix = f"{table_prefix}_{text_date_suffix}"
+    full_table = f"{dataset}.{table_id_suffix}"
 
     client = bigquery.Client(project=project_id, credentials=service_account.Credentials.from_service_account_info(credentials_info))
 
