@@ -105,8 +105,12 @@ class Linkedin_Marketing():
 
       # Aplanar columnas y limpiar otras fechas
       date_cols = [
-          "dateRange.start.month", "dateRange.start.day", "dateRange.start.year",
-          "dateRange.end.month", "dateRange.end.day", "dateRange.end.year"
+          "daterange_end_day",
+          "daterange_end_month",
+          "daterange_end_year",
+          "daterange_start_day",
+          "daterange_start_month",
+          "daterange_start_year"
       ]
       for col in date_cols:
           if col in DF.columns:
