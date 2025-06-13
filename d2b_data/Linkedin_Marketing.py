@@ -110,11 +110,15 @@ class Linkedin_Marketing():
 
     # 2. Limpieza genérica y esencial
     
-    # Asegurar que la columna 'date' se cree y sea de tipo datetime
+    # Asegurar que la columna 'date' se cree y sea de tipo fecha
     if date_str:
         DF["date"] = date_str
+    
     if "date" in DF.columns:
-        DF["date"] = pd.to_datetime(DF["date"])
+        # --- LA SOLUCIÓN ESTÁ AQUÍ ---
+        # 1. Convertimos a datetime completo para manejar cualquier formato de entrada.
+        # 2. Usamos .dt.date para descartar la parte de la hora.
+        DF["date"] = pd.to_datetime(DF["date"]).dt.date
 
     # Aplanar cualquier columna con JSON anidado (como 'adentities')
     if 'adentities' in DF.columns:
