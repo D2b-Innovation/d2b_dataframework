@@ -193,8 +193,8 @@ class Linkedin_Marketing():
     ids_for_query = ",".join([str(int(id)) for id in group_ids])
     search_query = f"search=(id:(values:List({ids_for_query})))"
     
-    # Este es el endpoint para los Grupos de Campaña
-    url = f"https://api.linkedin.com/v2/adCampaignGroupsV2?q={search_query}&fields=id,name"
+    # El endpoint para los Grupos de Campaña
+    url = f"https://api.linkedin.com/v2/adCampaignGroupsV2?q={quote(search_query)}&fields=id,name"
     
     logger.log(f"Consultando nombres para {len(group_ids)} grupos de campaña...")
     
@@ -207,5 +207,5 @@ class Linkedin_Marketing():
         return name_map
     except Exception as e:
         logger.critical(f"No se pudieron obtener los nombres de los grupos de campaña. Error: {e}")
-        return {}      
+        return {}
 

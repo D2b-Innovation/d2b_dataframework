@@ -3,6 +3,7 @@ import math
 import pandas as pd
 from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
+from facebook_business.exceptions import FacebookRequestError
 
 class Facebook_Marketing:
     def __init__(self, app_id, app_secret, access_token, id_account=None, unsampled=False, debug=False, verbose_logger=None):
@@ -99,10 +100,27 @@ class Facebook_Marketing:
         for attempt in range(max_tries):
             try:
                 async_job = my_account.get_insights(params=params, is_async=True)
-                self._debug(f"get_report | Intento {attempt+1} - Job lanzado correctamente")
+                self._debug(f"get_report | Intento {attempt+1} - Job lanzado correctamente para la cuenta {act_id}")
                 break
+            
+            except FacebookRequestError as e:
+                # ¡AQUÍ ESTÁ LA MAGIA! Formateamos un error limpio.
+                error_message = f"Error de API Meta (subcódigo {e.api_error_subcode()}): {e.api_error_message()}"
+                
+                # Logueamos el mensaje limpio y útil
+                self.verbose.critical(f"get_report | {error_message} [Cuenta: {act_id}]")
+                
+                # Si estás en modo debug, puedes imprimir todos los detalles si quieres
+                if self.debug:
+                    self.verbose.log(f"Detalles completos del error: {e}")
+                
+                # Importante: rompemos el bucle porque el error es de permisos, no de timeout.
+                # No tiene sentido reintentar.
+                raise e # Opcional: relanzar la excepción para que el programa principal se detenga
+
             except Exception as e:
-                self.verbose.critical(f"get_report | Error al iniciar job: {e}")
+                # Mantenemos una captura genérica para otros errores (de red, timeouts, etc.)
+                self.verbose.critical(f"get_report | Error inesperado al iniciar job para {act_id}: {e}")
                 time.sleep(2 ** attempt)
         else:
             raise Exception("get_report | No se pudo iniciar el job después de múltiples intentos")
