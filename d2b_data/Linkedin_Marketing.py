@@ -144,35 +144,43 @@ class Linkedin_Marketing():
             continue
 
   def get_campaign_names(self, campaign_ids):
-      """
-      Toma una lista de IDs de campaña y devuelve un diccionario mapeando cada ID a su nombre.
-      """
-      logger = self.verbose_logger
-      if not campaign_ids:
-          return {}
+    """
+    Toma una lista de IDs de campaña y devuelve un diccionario mapeando
+    cada ID a su nombre, usando el método de batch get.
+    """
+    logger = self.verbose_logger
+    if not campaign_ids:
+        return {}
 
-      ids_for_query = ",".join([str(int(id)) for id in campaign_ids])
-      
-      search_query = f"search=(id:(values:List({ids_for_query})))"
+    # La URL base para la consulta de campañas
+    base_url = "https://api.linkedin.com/v2/adCampaignsV2"
+    
+    # Parámetros para la petición. La librería 'requests' se encargará de
+    # formatearlo correctamente como: ?ids=123&ids=456...
+    params = {
+        'ids': [int(id) for id in campaign_ids],
+        'fields': 'id,name'
+    }
+    
+    logger.log(f"Consultando nombres para {len(campaign_ids)} campañas usando batch get...")
+    
+    try:
+        res = requests.get(base_url, headers=self.HEADERS, params=params)
+        res.raise_for_status() # Lanza un error si la petición falla (ej. 4xx, 5xx)
+        
+        # La respuesta para un batch get es un diccionario donde las claves son los IDs
+        data = res.json().get('results', {})
+        
+        # Creamos el diccionario de mapeo: {12345: "Mi Campaña", ...}
+        # Hay que convertir la clave (que viene como string) a integer para que coincida
+        name_map = {int(id_str): details['name'] for id_str, details in data.items()}
+        
+        logger.log(f"Se encontraron {len(name_map)} nombres de campañas.")
+        return name_map
 
-      encoded_search_query = quote(search_query)
-      
-      url = f"https://api.linkedin.com/v2/adCampaignsV2?q={encoded_search_query}&fields=id,name"
-      
-      logger.log(f"Consultando nombres para {len(campaign_ids)} campañas...")
-      
-      try:
-          res = requests.get(url, headers=self.HEADERS)
-          res.raise_for_status()
-          data = res.json().get('elements', [])
-          
-          name_map = {item['id']: item['name'] for item in data}
-          logger.log(f"Se encontraron {len(name_map)} nombres de campañas.")
-          return name_map
-
-      except Exception as e:
-          logger.critical(f"No se pudieron obtener los nombres de las campañas. Error: {e}")
-          return {}
+    except Exception as e:
+        logger.critical(f"No se pudieron obtener los nombres de las campañas. Error: {e}")
+        return {}
         
   def get_campaign_group_names(self, group_ids):
     """
