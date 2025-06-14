@@ -173,3 +173,33 @@ def get_campaign_names(self, campaign_ids):
     except Exception as e:
         logger.critical(f"No se pudieron obtener los nombres de las campañas. Error: {e}")
         return {} # Devolvemos un diccionario vacío si falla
+    
+# En d2b_data/Linkedin_Marketing.py
+# AÑADE este nuevo método a la clase
+
+def get_campaign_group_names(self, group_ids):
+    """
+    Toma una lista de IDs de Grupos de Campaña y devuelve un diccionario mapeando cada ID a su nombre.
+    """
+    logger = self.verbose_logger
+    if not group_ids:
+        return {}
+
+    ids_for_query = ",".join([str(int(id)) for id in group_ids])
+    search_query = f"search=(id:(values:List({ids_for_query})))"
+    
+    # Este es el endpoint para los Grupos de Campaña
+    url = f"https://api.linkedin.com/v2/adCampaignGroupsV2?q={search_query}&fields=id,name"
+    
+    logger.log(f"Consultando nombres para {len(group_ids)} grupos de campaña...")
+    
+    try:
+        res = requests.get(url, headers=self.HEADERS)
+        res.raise_for_status()
+        data = res.json().get('elements', [])
+        name_map = {item['id']: item['name'] for item in data}
+        logger.log(f"Se encontraron {len(name_map)} nombres de grupos de campaña.")
+        return name_map
+    except Exception as e:
+        logger.critical(f"No se pudieron obtener los nombres de los grupos de campaña. Error: {e}")
+        return {}
