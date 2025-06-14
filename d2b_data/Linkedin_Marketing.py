@@ -142,42 +142,39 @@ class Linkedin_Marketing():
             logger.critical(f"FALLO la carga para el día {date_suffix}. Error: {e}")
             continue
 
-def get_campaign_names(self, campaign_ids):
-    """
-    Toma una lista de IDs de campaña y devuelve un diccionario mapeando cada ID a su nombre.
-    """
-    logger = self.verbose_logger
-    if not campaign_ids:
-        return {}
+  def get_campaign_names(self, campaign_ids):
+      """
+      Toma una lista de IDs de campaña y devuelve un diccionario mapeando cada ID a su nombre.
+      """
+      logger = self.verbose_logger
+      if not campaign_ids:
+          return {}
 
-    # La API de gestión permite buscar múltiples campañas a la vez.
-    # Convertimos la lista de IDs al formato que necesita la API.
-    ids_for_query = ",".join([str(int(id)) for id in campaign_ids])
-    search_query = f"search=(id:(values:List({ids_for_query})))"
-    
-    # Este es el endpoint de "gestión", que sí nos da los nombres.
-    url = f"https://api.linkedin.com/v2/adCampaignsV2?q={search_query}&fields=id,name"
-    
-    logger.log(f"Consultando nombres para {len(campaign_ids)} campañas...")
-    
-    try:
-        res = requests.get(url, headers=self.HEADERS)
-        res.raise_for_status()  # Lanza un error si la petición falla (ej. 4xx, 5xx)
-        data = res.json().get('elements', [])
-        
-        # Creamos un diccionario de mapeo: {12345: "Mi Campaña de Verano", ...}
-        name_map = {item['id']: item['name'] for item in data}
-        logger.log(f"Se encontraron {len(name_map)} nombres de campañas.")
-        return name_map
+      # La API de gestión permite buscar múltiples campañas a la vez.
+      # Convertimos la lista de IDs al formato que necesita la API.
+      ids_for_query = ",".join([str(int(id)) for id in campaign_ids])
+      search_query = f"search=(id:(values:List({ids_for_query})))"
+      
+      # Este es el endpoint de "gestión", que sí nos da los nombres.
+      url = f"https://api.linkedin.com/v2/adCampaignsV2?q={search_query}&fields=id,name"
+      
+      logger.log(f"Consultando nombres para {len(campaign_ids)} campañas...")
+      
+      try:
+          res = requests.get(url, headers=self.HEADERS)
+          res.raise_for_status()  # Lanza un error si la petición falla (ej. 4xx, 5xx)
+          data = res.json().get('elements', [])
+          
+          # Creamos un diccionario de mapeo: {12345: "Mi Campaña de Verano", ...}
+          name_map = {item['id']: item['name'] for item in data}
+          logger.log(f"Se encontraron {len(name_map)} nombres de campañas.")
+          return name_map
 
-    except Exception as e:
-        logger.critical(f"No se pudieron obtener los nombres de las campañas. Error: {e}")
-        return {} # Devolvemos un diccionario vacío si falla
-    
-# En d2b_data/Linkedin_Marketing.py
-# AÑADE este nuevo método a la clase
-
-def get_campaign_group_names(self, group_ids):
+      except Exception as e:
+          logger.critical(f"No se pudieron obtener los nombres de las campañas. Error: {e}")
+          return {} # Devolvemos un diccionario vacío si falla
+      
+  def get_campaign_group_names(self, group_ids):
     """
     Toma una lista de IDs de Grupos de Campaña y devuelve un diccionario mapeando cada ID a su nombre.
     """
@@ -202,4 +199,5 @@ def get_campaign_group_names(self, group_ids):
         return name_map
     except Exception as e:
         logger.critical(f"No se pudieron obtener los nombres de los grupos de campaña. Error: {e}")
-        return {}
+        return {}      
+
