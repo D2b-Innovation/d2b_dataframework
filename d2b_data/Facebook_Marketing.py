@@ -6,13 +6,12 @@ from facebook_business.adobjects.adaccount import AdAccount
 from facebook_business.exceptions import FacebookRequestError
 
 class Facebook_Marketing:
-    def __init__(self, app_id, app_secret, access_token, id_account=None, unsampled=False, debug=False, verbose_logger=None):
+    def __init__(self, app_id, app_secret, access_token, id_account=None, unsampled=False, verbose_logger=None):
         self.app_id = app_id
         self.app_secret = app_secret
         self.access_token = access_token
         self.unsampled = unsampled
-        self.debug = debug
-        self.id_account = id_account  # opcional
+        self.id_account = id_account
         self.verbose = verbose_logger if verbose_logger else self._null_verbose()
         self.service = FacebookAdsApi.init(self.app_id, self.app_secret, self.access_token)
 
@@ -21,11 +20,6 @@ class Facebook_Marketing:
             def log(self, *args, **kwargs): pass
             def critical(self, *args, **kwargs): pass
         return DummyVerbose()
-
-    def _debug(self, message):
-        if self.debug:
-            print(message)
-        self.verbose.log(message)
 
     def get_report_dataframe(self, params, id_account=None):
         id_account = id_account or self.id_account
@@ -36,7 +30,7 @@ class Facebook_Marketing:
         act_id = f"act_{id_account}"
 
         if self.unsampled:
-            self._debug("get_report_dataframe | Unsampled")
+            self.verbose.log("get_report_dataframe | Unsampled")
             unsampled_array = []
             date_range = pd.date_range(start=params["time_range"]["since"], end=params["time_range"]["until"])
 
@@ -66,22 +60,22 @@ class Facebook_Marketing:
                     default_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
                     df_day = pd.DataFrame(columns=default_cols)
                 else:
+                    if not isinstance(report, list) or not all(isinstance(r, dict) for r in report):
+                        self.verbose.critical(f"[{id_account}] Facebook devolvió datos mal formateados para {str_date}: {type(report)} - {report}")
+                        raise ValueError("Bad data to set object data")
                     df_day = pd.DataFrame(report)
                     if len(report) > 999:
                         self.verbose.critical(f"[{id_account}] Día {str_date}: Facebook devolvió más de 999 filas. Posible muestreo.")
 
                 duration = round(time.time() - start_time, 2)
                 self.verbose.log(f"[{id_account}] {str_date} completado en {duration} segundos")
-
+                self.verbose.log(f"get_report_dataframe | Report size {len(report)}")
                 unsampled_array.append(df_day)
-
-                self._debug(f"get_report_dataframe | Report size {len(report)}")
 
             df_facebook = pd.concat(unsampled_array)
 
         else:
             report = self.get_report(params, act_id)
-            
             if not isinstance(report, list) or not all(isinstance(r, dict) for r in report):
                 self.verbose.critical(f"[{act_id}] Facebook devolvió un objeto inválido: {type(report)} - contenido: {report}")
                 raise ValueError("Bad data to set object data")
@@ -105,26 +99,13 @@ class Facebook_Marketing:
         for attempt in range(max_tries):
             try:
                 async_job = my_account.get_insights(params=params, is_async=True)
-                self._debug(f"get_report | Intento {attempt+1} - Job lanzado correctamente para la cuenta {act_id}")
+                self.verbose.log(f"get_report | Intento {attempt+1} - Job lanzado correctamente para la cuenta {act_id}")
                 break
-            
             except FacebookRequestError as e:
-                # ¡AQUÍ ESTÁ LA MAGIA! Formateamos un error limpio.
                 error_message = f"Error de API Meta (subcódigo {e.api_error_subcode()}): {e.api_error_message()}"
-                
-                # Logueamos el mensaje limpio y útil
                 self.verbose.critical(f"get_report | {error_message} [Cuenta: {act_id}]")
-                
-                # Si estás en modo debug, puedes imprimir todos los detalles si quieres
-                if self.debug:
-                    self.verbose.log(f"Detalles completos del error: {e}")
-                
-                # Importante: rompemos el bucle porque el error es de permisos, no de timeout.
-                # No tiene sentido reintentar.
-                raise e # Opcional: relanzar la excepción para que el programa principal se detenga
-
+                raise e
             except Exception as e:
-                # Mantenemos una captura genérica para otros errores (de red, timeouts, etc.)
                 self.verbose.critical(f"get_report | Error inesperado al iniciar job para {act_id}: {e}")
                 time.sleep(2 ** attempt)
         else:
@@ -135,28 +116,28 @@ class Facebook_Marketing:
         while tries < 60:
             status = async_job.api_get().get('async_status', '')
             if status == 'Job Completed':
-                self._debug("get_report | Job completado")
+                self.verbose.log("get_report | Job completado")
                 return async_job.get_result()
             elif status == 'Job Failed':
                 raise Exception("get_report | Job falló en el servidor de Meta")
             else:
-                self._debug(f"get_report | Esperando... intento {tries+1}")
+                self.verbose.log(f"get_report | Esperando... intento {tries+1}")
                 time.sleep(20)
                 tries += 1
 
         raise TimeoutError("get_report | Timeout esperando el job")
 
     def def_report_array_accounts(self, params, id_accounts):
-        self._debug("def_report_array_accounts | Procesando múltiples cuentas")
+        self.verbose.log("def_report_array_accounts | Procesando múltiples cuentas")
         array_df = []
         for acc in id_accounts:
-            self._debug(f"Cuenta: {acc}")
+            self.verbose.log(f"Cuenta: {acc}")
             df = self.get_report_dataframe(params, acc)
             array_df.append(df)
         return pd.concat(array_df)
 
     def _unique_actions(self, df):
-        self._debug("_unique_actions")
+        self.verbose.log("_unique_actions")
         actions_per_column = {}
         for column in df.columns:
             if df[column].apply(lambda x: isinstance(x, list)).any():
