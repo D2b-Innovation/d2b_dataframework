@@ -117,7 +117,7 @@ class Facebook_Marketing:
             status = async_job.api_get().get('async_status', '')
             if status == 'Job Completed':
                 self.verbose.log("get_report | Job completado")
-                return async_job.get_result()
+                return [record.export_all_data() for record in async_job.get_result()]
             elif status == 'Job Failed':
                 raise Exception("get_report | Job falló en el servidor de Meta")
             else:
