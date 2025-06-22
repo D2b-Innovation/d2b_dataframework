@@ -81,6 +81,11 @@ class Facebook_Marketing:
 
         else:
             report = self.get_report(params, act_id)
+            
+            if not isinstance(report, list) or not all(isinstance(r, dict) for r in report):
+                self.verbose.critical(f"[{act_id}] Facebook devolvió un objeto inválido: {type(report)} - contenido: {report}")
+                raise ValueError("Bad data to set object data")
+
             if len(report) == 0:
                 default_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
                 df_facebook = pd.DataFrame(columns=default_cols)
