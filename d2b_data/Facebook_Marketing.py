@@ -102,9 +102,25 @@ class Facebook_Marketing:
                 self.verbose.log(f"get_report | Intento {attempt+1} - Job lanzado correctamente para la cuenta {act_id}")
                 break
             except FacebookRequestError as e:
-                error_message = f"Error de API Meta (subcódigo {e.api_error_subcode()}): {e.api_error_message()}"
-                self.verbose.critical(f"get_report | {error_message} [Cuenta: {act_id}]")
-                raise e
+                subcode = e.api_error_subcode()
+                status = e.http_status()
+                message = e.api_error_message()
+
+                log_msg = (
+                    f"get_report | Facebook API error\n"
+                    f"  Subcode: {subcode}\n"
+                    f"  Status:  {status}\n"
+                    f"  Message: {message}\n"
+                    f"  Params:  {params}\n"
+                    f"  Account: {act_id}"
+                )
+
+                if subcode == 99 or status == 500:
+                    self.verbose.critical("Error crítico en Meta API:\n" + log_msg)
+                    raise Exception("Meta API devolvió error 500 con subcode 99: problema de autenticación o permisos.")
+                else:
+                    self.verbose.critical(log_msg)
+                    raise e
             except Exception as e:
                 self.verbose.critical(f"get_report | Error inesperado al iniciar job para {act_id}: {e}")
                 time.sleep(2 ** attempt)
