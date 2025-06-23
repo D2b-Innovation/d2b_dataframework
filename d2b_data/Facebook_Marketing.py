@@ -27,7 +27,7 @@ class Facebook_Marketing:
             return self.def_report_array_accounts(params, id_account)
 
         df_facebook = pd.DataFrame()
-        act_id = f"act_{id_account}"
+        act_id = f"act_{str(id_account)}"
 
         if self.unsampled:
             self.verbose.log("get_report_dataframe | Unsampled")
@@ -132,6 +132,7 @@ class Facebook_Marketing:
         array_df = []
         for acc in id_accounts:
             self.verbose.log(f"Cuenta: {acc}")
+            acc = str(acc)
             df = self.get_report_dataframe(params, acc)
             array_df.append(df)
         return pd.concat(array_df)
