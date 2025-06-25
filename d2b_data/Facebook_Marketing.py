@@ -17,7 +17,7 @@ class Facebook_Marketing:
         self.unsampled = unsampled
         self.id_account = id_account
         self.verbose = verbose_logger if verbose_logger else self._null_verbose()
-        self.verbose.log("--- !!! EXECUTING Facebook_Marketing Class v3.1 - Deployed on 2025-06-25 15:30 !!! ---")
+        self.verbose.log("--- !!! EXECUTING Facebook_Marketing Class v3.2 - Deployed on 2025-06-25 15:30 !!! ---")
         self.service = FacebookAdsApi.init(self.app_id, self.app_secret, self.access_token)
 
 
