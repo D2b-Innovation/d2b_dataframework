@@ -5,6 +5,10 @@ from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
 from facebook_business.exceptions import FacebookRequestError
 
+import json
+from google.cloud import storage
+from datetime import datetime
+
 class Facebook_Marketing:
     def __init__(self, app_id, app_secret, access_token, id_account=None, unsampled=False, verbose_logger=None):
         self.app_id = app_id
@@ -86,19 +90,56 @@ class Facebook_Marketing:
                 default_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
                 df_facebook = pd.DataFrame(columns=default_cols)
             else:
-                df_facebook = pd.DataFrame(report, index=None)
+                try:
+                    # Intentamos crear el DataFrame como en el último intento
+                    self.verbose.log("Intentando crear el DataFrame desde el reporte crudo...")
+                    df_facebook = pd.DataFrame(report, index=None)
+                    self.verbose.log("DataFrame creado exitosamente desde el reporte.")
+
+                except Exception as e:
+                    # SI FALLA, LO ATRAPAMOS Y GUARDAMOS LOS DATOS CRUDOS
+                    self.verbose.critical("¡FALLO CRÍTICO EN LA CREACIÓN DEL DATAFRAME! Guardando datos crudos en GCS para análisis.")
+                    
+                    try:
+                        storage_client = storage.Client()
+                        
+                        # !!! CAMBIA ESTO POR EL NOMBRE DE TU BUCKET !!!
+                        bucket_name = "d2b-data-management-debug-logs"
+                        bucket = storage_client.bucket(bucket_name)
+                        
+                        # Creamos un nombre de archivo único con fecha y hora
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        blob_name = f"facebook_error_data/report_raw_{act_id}_{timestamp}.json"
+                        blob = bucket.blob(blob_name)
+                        
+                        # Convertimos la lista de diccionarios a un string en formato JSON
+                        # ensure_ascii=False es importante para que no escape caracteres especiales
+                        raw_data_json = json.dumps(report, indent=2, ensure_ascii=False)
+                        
+                        # Subimos el archivo
+                        blob.upload_from_string(raw_data_json, content_type='application/json')
+                        self.verbose.log(f"Datos crudos guardados exitosamente en: gs://{bucket_name}/{blob_name}")
+
+                    except Exception as gcs_e:
+                        self.verbose.critical(f"FALLO AL INTENTAR GUARDAR LOS DATOS EN GCS: {gcs_e}")
+                    
+                    # Re-lanzamos la excepción original para que el programa falle como siempre, pero después de guardar la evidencia
+                    raise e
+                # --- FIN DEL BLOQUE DE CAPTURA Y GUARDADO EN GCS ---    
+
+        #         df_facebook = pd.DataFrame(report, index=None)
         
-        if not df_facebook.empty:
-            df_facebook.reset_index(drop=True, inplace=True)
+        # if not df_facebook.empty:
+        #     df_facebook.reset_index(drop=True, inplace=True)
         
 
-        # Procesar acciones
-        actions_dict = self._unique_actions(df_facebook)
-        for column, actions in actions_dict.items():
-            for action in actions:
-                df_facebook[f"_action_{action}"] = df_facebook[column].apply(lambda x: self._split_text(x, action))
+        # # Procesar acciones
+        # actions_dict = self._unique_actions(df_facebook)
+        # for column, actions in actions_dict.items():
+        #     for action in actions:
+        #         df_facebook[f"_action_{action}"] = df_facebook[column].apply(lambda x: self._split_text(x, action))
 
-        return df_facebook
+        # return df_facebook
 
     def get_report(self, params, act_id, max_tries=10):
         my_account = AdAccount(act_id)
