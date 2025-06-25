@@ -151,7 +151,7 @@ class Facebook_Marketing:
             acc = str(acc)
             df = self.get_report_dataframe(params, acc)
             array_df.append(df)
-        return pd.concat(array_df)
+        return pd.concat(array_df, ignore_index=True)
 
     def _unique_actions(self, df):
         self.verbose.log("_unique_actions")
