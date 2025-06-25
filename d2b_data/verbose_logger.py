@@ -1,10 +1,10 @@
 from datetime import datetime
 
 class Verbose:
-    def __init__(self, active=True, alerts_enabled=True):
+    def __init__(self, active=True, alerts_enabled=True, workflow_name="UnknownWorkflow"):
         self.active = active
         self.alerts_enabled = alerts_enabled
-        self.workflow_name = "UnknownWorkflow"  
+        self.workflow_name = workflow_name  
         self.bot_url = "https://us-central1-d2b-data-management.cloudfunctions.net/innovation-messenger-hangout"
 
     def log(self, msg):
@@ -13,9 +13,7 @@ class Verbose:
             print(f"[{timestamp}]: {msg}")
 
     def critical(self, msg, current_workflow_name=None):
-        name_to_use = current_workflow_name
-        if name_to_use is None:
-            name_to_use = globals().get('workflow_name', "UnknownWorkflow")
+        name_to_use = current_workflow_name or self.workflow_name or "UnknownWorkflow"
         
         full_msg = f"[{name_to_use}] {msg}" # Mensaje para alerta y consola (sin 'e' ni 'exc_info')
         if self.active:
