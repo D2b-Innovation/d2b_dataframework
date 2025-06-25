@@ -4,6 +4,7 @@ class Verbose:
     def __init__(self, active=True, alerts_enabled=True):
         self.active = active
         self.alerts_enabled = alerts_enabled
+        self.workflow_name = "UnknownWorkflow"  
         self.bot_url = "https://us-central1-d2b-data-management.cloudfunctions.net/innovation-messenger-hangout"
 
     def log(self, msg):
