@@ -91,13 +91,48 @@ class Facebook_Marketing:
         if not df_facebook.empty:
             df_facebook.reset_index(drop=True, inplace=True)
         
-        # Procesar acciones
-        actions_dict = self._unique_actions(df_facebook)
-        for column, actions in actions_dict.items():
-            for action in actions:
-                df_facebook[f"_action_{action}"] = df_facebook[column].apply(lambda x: self._split_text(x, action))
+        try:
+            self.verbose.log("--- DIAGNÓSTICO AVANZADO INICIADO ---")
+            
+            # 1. Imprimir información completa del DataFrame
+            buffer = io.StringIO()
+            df_facebook.info(buf=buffer)
+            info_str = buffer.getvalue()
+            self.verbose.log(f"Estado de df_facebook ANTES del bucle de acciones:\n{info_str}")
 
-        return df_facebook
+            # 2. Verificación explícita y contundente de la unicidad del índice
+            is_unique = df_facebook.index.is_unique
+            self.verbose.log(f"Verificación de Índice Único -> {is_unique}")
+            if not is_unique:
+                duplicates = df_facebook.index[df_facebook.index.duplicated()].unique().tolist()
+                self.verbose.critical(f"¡¡¡ALERTA!!! SE ENCONTRARON ÍNDICES DUPLICADOS DESPUÉS DE RESET_INDEX: {duplicates[:10]}")
+
+            # 3. Procesamiento de acciones (el bloque que creemos que falla)
+            self.verbose.log("Intentando procesar acciones...")
+            actions_dict = self._unique_actions(df_facebook)
+            self.verbose.log(f"Diccionario de acciones a procesar: {actions_dict}")
+            
+            for column, actions in actions_dict.items():
+                for action in actions:
+                    df_facebook[f"_action_{action}"] = df_facebook[column].apply(lambda x: self._split_text(x, action))
+
+            self.verbose.log("--- Bucle de acciones completado SIN ERRORES. Retornando DataFrame. ---")
+
+        except Exception as e:
+            self.verbose.critical("--- ¡ERROR CAPTURADO DENTRO DEL BLOQUE DE DIAGNÓSTICO! ---")
+            self.verbose.critical(f"El error es del tipo: {type(e).__name__}")
+            self.verbose.critical(f"Mensaje del error: {e}")
+            self.verbose.error(f"Traceback completo DENTRO de la clase:\n{traceback.format_exc()}")
+            # Re-lanzamos la excepción para que el programa falle como antes, pero después de darnos la información
+            raise e
+
+        # # Procesar acciones
+        # actions_dict = self._unique_actions(df_facebook)
+        # for column, actions in actions_dict.items():
+        #     for action in actions:
+        #         df_facebook[f"_action_{action}"] = df_facebook[column].apply(lambda x: self._split_text(x, action))
+
+        # return df_facebook
 
     def get_report(self, params, act_id, max_tries=10):
         my_account = AdAccount(act_id)
