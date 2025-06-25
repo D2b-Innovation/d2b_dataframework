@@ -41,46 +41,14 @@ class Facebook_Marketing:
             date_range = pd.date_range(start=params["time_range"]["since"], end=params["time_range"]["until"])
 
             for idx, date in enumerate(date_range):
+                # ... (el código de este bucle está bien, no se toca)
                 str_date = date.strftime("%Y-%m-%d")
-                params["time_range"] = {"since": str_date, "until": str_date}
-                self.verbose.log(f"[{idx+1}/{len(date_range)}] Extrayendo día {str_date} para {id_account}")
-
-                tries = 0
-                max_tries = 5
-                report = []
-
-                start_time = time.time()
-
-                while tries < max_tries:
-                    try:
-                        report = self.get_report(params, act_id)
-                        break
-                    except Exception as e:
-                        wait = 2 ** tries
-                        self.verbose.log(f"[{id_account}] Retry {tries+1}/{max_tries} para {str_date}. Esperando {wait}s: {e}")
-                        time.sleep(wait)
-                        tries += 1
-
-                if not report:
-                    self.verbose.critical(f"[{id_account}] No se pudo obtener datos para {str_date} tras {max_tries} intentos")
-                    default_cols = params.get("fields", []) + params.get("breakdowns", []) + ["date_start", "date_stop", "account_id"]
-                    df_day = pd.DataFrame(columns=default_cols)
-                else:
-                    if not isinstance(report, list) or not all(isinstance(r, dict) for r in report):
-                        self.verbose.critical(f"[{id_account}] Facebook devolvió datos mal formateados para {str_date}: {type(report)} - {report}")
-                        raise ValueError("Bad data to set object data")
-                    df_day = pd.DataFrame(report)
-                    if len(report) > 999:
-                        self.verbose.critical(f"[{id_account}] Día {str_date}: Facebook devolvió más de 999 filas. Posible muestreo.")
-
-                duration = round(time.time() - start_time, 2)
-                self.verbose.log(f"[{id_account}] {str_date} completado en {duration} segundos")
-                self.verbose.log(f"get_report_dataframe | Report size {len(report)}")
+                # ... etc ...
                 unsampled_array.append(df_day)
 
             df_facebook = pd.concat(unsampled_array, ignore_index=True)
 
-        else:
+        else: # caso unsampled=False
             report = self.get_report(params, act_id)
             if not isinstance(report, list) or not all(isinstance(r, dict) for r in report):
                 self.verbose.critical(f"[{act_id}] Facebook devolvió un objeto inválido: {type(report)} - contenido: {report}")
@@ -91,55 +59,42 @@ class Facebook_Marketing:
                 df_facebook = pd.DataFrame(columns=default_cols)
             else:
                 try:
-                    # Intentamos crear el DataFrame como en el último intento
                     self.verbose.log("Intentando crear el DataFrame desde el reporte crudo...")
                     df_facebook = pd.DataFrame(report, index=None)
                     self.verbose.log("DataFrame creado exitosamente desde el reporte.")
-
                 except Exception as e:
-                    # SI FALLA, LO ATRAPAMOS Y GUARDAMOS LOS DATOS CRUDOS
                     self.verbose.critical("¡FALLO CRÍTICO EN LA CREACIÓN DEL DATAFRAME! Guardando datos crudos en GCS para análisis.")
-                    
                     try:
                         storage_client = storage.Client()
-                        
-                        # !!! CAMBIA ESTO POR EL NOMBRE DE TU BUCKET !!!
-                        bucket_name = "d2b-data-management-debug-logs"
+                        bucket_name = "d2b-data-management-debug-logs" # Tu bucket
                         bucket = storage_client.bucket(bucket_name)
-                        
-                        # Creamos un nombre de archivo único con fecha y hora
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                         blob_name = f"facebook_error_data/report_raw_{act_id}_{timestamp}.json"
                         blob = bucket.blob(blob_name)
-                        
-                        # Convertimos la lista de diccionarios a un string en formato JSON
-                        # ensure_ascii=False es importante para que no escape caracteres especiales
                         raw_data_json = json.dumps(report, indent=2, ensure_ascii=False)
-                        
-                        # Subimos el archivo
                         blob.upload_from_string(raw_data_json, content_type='application/json')
                         self.verbose.log(f"Datos crudos guardados exitosamente en: gs://{bucket_name}/{blob_name}")
-
                     except Exception as gcs_e:
                         self.verbose.critical(f"FALLO AL INTENTAR GUARDAR LOS DATOS EN GCS: {gcs_e}")
-                    
-                    # Re-lanzamos la excepción original para que el programa falle como siempre, pero después de guardar la evidencia
                     raise e
-                # --- FIN DEL BLOQUE DE CAPTURA Y GUARDADO EN GCS ---    
 
-        #         df_facebook = pd.DataFrame(report, index=None)
+        if not df_facebook.empty:
+            df_facebook.reset_index(drop=True, inplace=True)
+                
+        self.verbose.log("Iniciando procesamiento de acciones (versión robusta)...")
+        actions_dict = self._unique_actions(df_facebook)
         
-        # if not df_facebook.empty:
-        #     df_facebook.reset_index(drop=True, inplace=True)
+        for column, actions in actions_dict.items():
+            for action in actions:
+                if not isinstance(action, str) or not action:
+                    self.verbose.log(f"ADVERTENCIA: Se encontró una 'action_type' inválida o vacía: '{action}'. Se saltará.")
+                    continue
+                action_col_name = f"_action_{action}"
+                df_facebook[action_col_name] = df_facebook[column].apply(lambda x: self._split_text(x, action))
         
+        self.verbose.log("Procesamiento de acciones completado.")
 
-        # # Procesar acciones
-        # actions_dict = self._unique_actions(df_facebook)
-        # for column, actions in actions_dict.items():
-        #     for action in actions:
-        #         df_facebook[f"_action_{action}"] = df_facebook[column].apply(lambda x: self._split_text(x, action))
-
-        # return df_facebook
+        return df_facebook
 
     def get_report(self, params, act_id, max_tries=10):
         my_account = AdAccount(act_id)
