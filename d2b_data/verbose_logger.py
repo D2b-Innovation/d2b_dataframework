@@ -32,6 +32,9 @@ class Verbose:
             except Exception as alert_exception:
                 if self.active: print(f"ERROR: [{name_to_use} via Verbose.critical] Exception sending critical alert: {alert_exception}")
 
+    def set_workflow_name(self, name):
+        self.workflow_name = name
+
 # CONFIGURACIÓN GLOBAL
 VERBOSE_ACTIVE = True
 ALERTS_ENABLED = True 
