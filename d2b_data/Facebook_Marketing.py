@@ -72,7 +72,7 @@ class Facebook_Marketing:
                 self.verbose.log(f"get_report_dataframe | Report size {len(report)}")
                 unsampled_array.append(df_day)
 
-            df_facebook = pd.concat(unsampled_array)
+            df_facebook = pd.concat(unsampled_array, ignore_index=True)
 
         else:
             report = self.get_report(params, act_id)
