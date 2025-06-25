@@ -87,7 +87,10 @@ class Facebook_Marketing:
                 df_facebook = pd.DataFrame(columns=default_cols)
             else:
                 df_facebook = pd.DataFrame(report)
-
+        
+        if not df_facebook.empty:
+            df_facebook.reset_index(drop=True, inplace=True)
+        
         # Procesar acciones
         actions_dict = self._unique_actions(df_facebook)
         for column, actions in actions_dict.items():
