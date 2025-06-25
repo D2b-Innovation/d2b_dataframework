@@ -86,10 +86,18 @@ class Facebook_Marketing:
         
         for column, actions in actions_dict.items():
             for action in actions:
+                # Validamos que 'action' sea un string válido y no vacío.
                 if not isinstance(action, str) or not action:
                     self.verbose.log(f"ADVERTENCIA: Se encontró una 'action_type' inválida o vacía: '{action}'. Se saltará.")
                     continue
+
                 action_col_name = f"_action_{action}"
+
+                # --- LA SOLUCIÓN FINAL ---
+                # Verificamos si la columna ya existe en el DataFrame antes de intentar crearla.
+                if action_col_name in df_facebook.columns:
+                    self.verbose.log(f"ADVERTENCIA: La columna '{action_col_name}' ya existe. Saltando para evitar duplicados.")
+                    continue
                 df_facebook[action_col_name] = df_facebook[column].apply(lambda x: self._split_text(x, action))
         
         self.verbose.log("Procesamiento de acciones completado.")
