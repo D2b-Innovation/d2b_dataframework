@@ -64,19 +64,6 @@ class Facebook_Marketing:
                     self.verbose.log("DataFrame creado exitosamente desde el reporte.")
                 except Exception as e:
                     self.verbose.critical("¡FALLO CRÍTICO EN LA CREACIÓN DEL DATAFRAME! Guardando datos crudos en GCS para análisis.")
-                    try:
-                        storage_client = storage.Client()
-                        bucket_name = "d2b-data-management-debug-logs" # Tu bucket
-                        bucket = storage_client.bucket(bucket_name)
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        blob_name = f"facebook_error_data/report_raw_{act_id}_{timestamp}.json"
-                        blob = bucket.blob(blob_name)
-                        raw_data_json = json.dumps(report, indent=2, ensure_ascii=False)
-                        blob.upload_from_string(raw_data_json, content_type='application/json')
-                        self.verbose.log(f"Datos crudos guardados exitosamente en: gs://{bucket_name}/{blob_name}")
-                    except Exception as gcs_e:
-                        self.verbose.critical(f"FALLO AL INTENTAR GUARDAR LOS DATOS EN GCS: {gcs_e}")
-                    raise e
 
         if not df_facebook.empty:
             df_facebook.reset_index(drop=True, inplace=True)
