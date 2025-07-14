@@ -70,13 +70,21 @@ class Alodesk_API:
                 self.verbose.critical(f"_paginate | Formato inesperado: {type(data)}")
                 break
 
-    def download_leads(self, *, days_back: int = 7) -> pd.DataFrame:
+    def download_leads(self, *, days_back: int = 7, single_day: bool = False) -> pd.DataFrame:
         hoy = date.today()
         inicio = hoy - timedelta(days=days_back)
 
+        if single_day:
+            start = end = inicio.isoformat()
+            self.verbose.log(f"Descargando leads SOLO para el día {start}")
+        else:
+            start = inicio.isoformat()
+            end = hoy.isoformat()
+            self.verbose.log(f"Descargando leads desde {start} hasta {end}")
+
         params = {
-            "startDate": inicio.isoformat(),
-            "endDate": hoy.isoformat(),
+            "startDate": start,
+            "endDate": end,
         }
 
         self.verbose.log(f"Descargando leads del {inicio.isoformat()} al {hoy.isoformat()}")
