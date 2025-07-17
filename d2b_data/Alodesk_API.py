@@ -23,6 +23,26 @@ class Alodesk_API:
         }
 
         self.verbose.log("--- INIT Alodesk_API v1.0 ---")
+    # ----------------------------------------------------------------------
+    # NUEVO: utilitario estático para deduplicar manteniendo el último update
+    # ----------------------------------------------------------------------
+    @staticmethod
+    def dedup_leads(df: pd.DataFrame,
+                    id_col: str = "lead_id",
+                    ts_col: str = "updated_at") -> pd.DataFrame:
+        """
+        Devuelve un DataFrame sin duplicados en `id_col`,
+        conservando el registro con timestamp más reciente en `ts_col`.
+        """
+        if df.empty:
+            return df
+
+        df = df.copy()
+        df[ts_col] = pd.to_datetime(df[ts_col], errors="coerce")
+        return (df
+                .sort_values(ts_col)              # más antiguo → más nuevo
+                .drop_duplicates(subset=id_col, keep="last"))
+    
 
     @retry(
         reraise=True,
@@ -69,17 +89,24 @@ class Alodesk_API:
             else:
                 self.verbose.critical(f"_paginate | Formato inesperado: {type(data)}")
                 break
+    # ----------------------------------------------------------------------
+    # MODIFICADO: download_leads  (default days_back=30)
+    # ----------------------------------------------------------------------
+    def download_leads(self, *, days_back: int = 30, single_day: bool = False) -> pd.DataFrame:
+        """
+        Descarga leads entre hoy-days_back (inclusive) y hoy (exclusive).
+        Si `single_day=True`, solo descarga el día exacto `hoy-days_back`.
+        """
 
-    def download_leads(self, *, days_back: int = 7, single_day: bool = False) -> pd.DataFrame:
-        hoy = date.today()
-        inicio = hoy - timedelta(days=days_back)
+        today = date.today()
+        start_day = today - timedelta(days=days_back)
 
         if single_day:
-            start = end = inicio.isoformat()
+            start = end = start_day.isoformat()
             self.verbose.log(f"Descargando leads SOLO para el día {start}")
         else:
-            start = inicio.isoformat()
-            end = hoy.isoformat()
+            start = start_day.isoformat()
+            end = today.isoformat()
             self.verbose.log(f"Descargando leads desde {start} hasta {end}")
 
         params = {
@@ -87,7 +114,7 @@ class Alodesk_API:
             "endDate": end,
         }
 
-        self.verbose.log(f"Descargando leads del {inicio.isoformat()} al {hoy.isoformat()}")
+        self.verbose.log(f"Descargando leads del {start} al {end}")
 
         rows = list(self._paginate("api/leads/report/", params=params))
         df = pd.DataFrame(rows)
