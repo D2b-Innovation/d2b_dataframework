@@ -38,7 +38,7 @@ class Alodesk_API:
             return df
 
         df = df.copy()
-        df[ts_col] = pd.to_datetime(df[ts_col], errors="coerce")
+        df[ts_col] = pd.to_datetime(df[ts_col].astype(str), errors="coerce")
         return (df
                 .sort_values(ts_col)              # más antiguo → más nuevo
                 .drop_duplicates(subset=id_col, keep="last"))
