@@ -41,9 +41,7 @@ class Facebook_Marketing:
             date_range = pd.date_range(start=params["time_range"]["since"], end=params["time_range"]["until"])
 
             for idx, date in enumerate(date_range):
-                # ... (el código de este bucle está bien, no se toca)
                 str_date = date.strftime("%Y-%m-%d")
-                # ... etc ...
                 unsampled_array.append(df_day)
 
             df_facebook = pd.concat(unsampled_array, ignore_index=True)
@@ -128,9 +126,28 @@ class Facebook_Marketing:
         tries = 0
         while tries < 60:
             status = async_job.api_get().get('async_status', '')
+            ### - Prueba para capturar errores de Meta API
             if status == 'Job Completed':
                 self.verbose.log("get_report | Job completado")
-                return [record.export_all_data() for record in async_job.get_result()]
+                
+                result = async_job.get_result()
+
+                if result is None:
+                    self.verbose.critical("get_report | async_job.get_result() devolvió None.")
+                    return []
+
+                if not isinstance(result, list):
+                    self.verbose.critical(f"get_report | Resultado no es lista: {type(result)} | Contenido: {result}")
+                    return []
+
+                self.verbose.log(f"get_report | Resultado crudo recibido con {len(result)} registros.")
+
+                try:
+                    return [record.export_all_data() for record in result]
+                except Exception as e:
+                    self.verbose.critical(f"get_report | Error al exportar los datos: {e} | Resultado crudo: {result}")
+                    raise
+            ###
             elif status == 'Job Failed':
                 raise Exception("get_report | Job falló en el servidor de Meta")
             else:
