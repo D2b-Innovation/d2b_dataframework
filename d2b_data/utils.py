@@ -87,11 +87,11 @@ def extract_and_write_temp_credentials(client_name_from_map, source_csv_path, ve
                 expected_headers = ["Nombre", "project_id", "JSON"]
                 if header != expected_headers:
                     verbose_logger_param.critical(f"Encabezados CSV incorrectos en '{source_csv_path}'. Esperados: {expected_headers}, Obtenidos: {header}", current_workflow_name=current_workflow_name_param)
-                    return None
+                    return None, None
                 name_col_idx, json_col_idx = header.index('Nombre'), header.index('JSON')
             except (StopIteration, ValueError, IndexError) as e_header:
                 verbose_logger_param.critical(f"CSV malformado o encabezados no encontrados en '{source_csv_path}': {str(e_header)}", current_workflow_name=current_workflow_name_param)
-                return None
+                return None, None
 
             for row_number, row in enumerate(reader, 2):
                 if not row or len(row) <= max(name_col_idx, json_col_idx):
@@ -105,26 +105,26 @@ def extract_and_write_temp_credentials(client_name_from_map, source_csv_path, ve
                         credentials_dict = json.loads(json_block_str_from_csv)
                         if project_id_to_check_internally and credentials_dict.get("project_id") != project_id_to_check_internally:
                             verbose_logger_param.critical(f"DISCREPANCIA DE PROJECT_ID: JSON ('{credentials_dict.get('project_id')}') vs mapeo ('{project_id_to_check_internally}') para {client_name_from_map} (fila {row_number}).", current_workflow_name=current_workflow_name_param)
-                            return None
-                        
+                            return None, None
+
                         temp_file_prefix = f"temp_creds_{unidecode(client_name_from_map).replace(' ', '_').replace('-', '_')}_"
                         temp_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", prefix=temp_file_prefix)
                         temp_file_path = temp_file.name
                         json.dump(credentials_dict, temp_file, indent=2)
                         temp_file.close()
                         verbose_logger_param.log(f"extract_and_write_temp_credentials | Archivo temporal de credenciales creado: {temp_file_path}")
-                        return temp_file_path
+                        return temp_file_path, csv_client_name
                     except json.JSONDecodeError as e_json_decode:
                         verbose_logger_param.critical(f"Error decodificando JSON para {client_name_from_map} (fila {row_number}): {str(e_json_decode)}. JSON (inicio): {json_block_str_from_csv[:300]}", current_workflow_name=current_workflow_name_param)
-                        return None
+                        return None, None
                     except Exception as e_write_temp:
                         verbose_logger_param.critical(f"Error escribiendo archivo temporal para {client_name_from_map}: {str(e_write_temp)}", current_workflow_name=current_workflow_name_param)
-                        return None
+                        return None, None
             verbose_logger_param.log(f"extract_and_write_temp_credentials | No se encontró '{client_name_from_map}' en CSV '{source_csv_path}'.")
-            return None
+            return None, None
     except FileNotFoundError:
         verbose_logger_param.critical(f"extract_and_write_temp_credentials | Archivo CSV '{source_csv_path}' no encontrado.", current_workflow_name=current_workflow_name_param)
-        return None
+        return None, None
     except Exception as e_general_csv:
         verbose_logger_param.critical(f"extract_and_write_temp_credentials | Error general leyendo CSV '{source_csv_path}': {str(e_general_csv)}", current_workflow_name=current_workflow_name_param)
-        return None
+        return None, None
