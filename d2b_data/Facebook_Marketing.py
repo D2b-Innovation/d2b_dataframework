@@ -131,22 +131,26 @@ class Facebook_Marketing:
                 self.verbose.log("get_report | Job completado")
                 
                 result = async_job.get_result()
-
+                
                 if result is None:
                     self.verbose.critical("get_report | async_job.get_result() devolvió None.")
                     return []
 
-                if not isinstance(result, list):
-                    self.verbose.critical(f"get_report | Resultado no es lista: {type(result)} | Contenido: {result}")
-                    return []
+                self.verbose.log(f"get_report | Resultado crudo recibido, tipo: {type(result)}")
 
-                self.verbose.log(f"get_report | Resultado crudo recibido con {len(result)} registros.")
+                records = []
+                for record in result:
+                    try:
+                        records.append(record.export_all_data())
+                    except Exception as e:
+                        self.verbose.log(
+                            f"get_report | Error procesando un registro: {str(e)}",
+                            current_workflow_name=self.workflow_name
+                        )
+                        continue
 
-                try:
-                    return [record.export_all_data() for record in result]
-                except Exception as e:
-                    self.verbose.critical(f"get_report | Error al exportar los datos: {e} | Resultado crudo: {result}")
-                    raise
+                self.verbose.log(f"get_report | Exportación completada con {len(records)} registros.")
+                return records
             ###
             elif status == 'Job Failed':
                 raise Exception("get_report | Job falló en el servidor de Meta")
