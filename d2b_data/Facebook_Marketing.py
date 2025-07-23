@@ -90,6 +90,30 @@ class Facebook_Marketing:
         return df_facebook
 
     def get_report(self, params, act_id, max_tries=10):
+        """
+            Ejecuta una consulta de reportes asincrónica a la API de Facebook Ads para una cuenta específica.
+
+            Esta función lanza un job de insights (asincrónico) para la cuenta especificada y espera
+            hasta que el job se complete, falle o exceda el tiempo de espera. Si se completa correctamente,
+            extrae los datos del reporte y los transforma en una lista de registros exportados.
+
+            Args:
+                params (dict): Parámetros de consulta para `get_insights()`. Debe incluir campos como:
+                    - 'level': nivel de agregación ('campaign', 'adset', etc.)
+                    - 'fields': lista de métricas/dimensiones solicitadas
+                    - 'time_range': diccionario con 'since' y 'until'
+                    - (opcional) 'breakdowns', 'time_increment', etc.
+                act_id (str): ID de cuenta publicitaria en formato 'act_XXXXXXXXXXXX'.
+                max_tries (int, optional): Número máximo de intentos para iniciar el job. Por defecto es 10.
+
+            Returns:
+                list[dict]: Lista de registros extraídos del reporte, cada uno representando una fila con datos exportados.
+                En caso de error, puede lanzar una excepción o retornar una lista vacía si el resultado es None.
+
+            Raises:
+                Exception: Si la API lanza un error crítico (subcode 99 o status 500), si el job falla, 
+                        o si se agota el tiempo de espera sin recibir resultados.
+            """
         my_account = AdAccount(act_id)
         for attempt in range(max_tries):
             try:
@@ -126,16 +150,16 @@ class Facebook_Marketing:
         tries = 0
         while tries < 60:
             status = async_job.api_get().get('async_status', '')
-            ### - Prueba para capturar errores de Meta API
+
             if status == 'Job Completed':
                 self.verbose.log("get_report | Job completado")
-                
                 result = async_job.get_result()
-                
+
                 if result is None:
-                    self.verbose.critical("get_report | async_job.get_result() devolvió None.")
+                    self.verbose.critical(f"{act_id} | get_report | Resultado vacío o None recibido.")
                     return []
 
+                self.verbose.log(f"{act_id} | get_report | Resultado recibido con {len(result)} registros")
                 self.verbose.log(f"get_report | Resultado crudo recibido, tipo: {type(result)}")
 
                 records = []
@@ -151,15 +175,17 @@ class Facebook_Marketing:
 
                 self.verbose.log(f"get_report | Exportación completada con {len(records)} registros.")
                 return records
-            ###
+
             elif status == 'Job Failed':
-                raise Exception("get_report | Job falló en el servidor de Meta")
+                raise Exception(f"get_report | Job falló para la cuenta {act_id}")
+
             else:
                 self.verbose.log(f"get_report | Esperando... intento {tries+1}")
                 time.sleep(20)
                 tries += 1
 
-        raise TimeoutError("get_report | Timeout esperando el job")
+        raise TimeoutError(f"get_report | Timeout esperando el job para {act_id}")
+
 
     def def_report_array_accounts(self, params, id_accounts):
         self.verbose.log("def_report_array_accounts | Procesando múltiples cuentas")
