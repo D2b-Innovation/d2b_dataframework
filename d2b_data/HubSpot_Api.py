@@ -289,17 +289,21 @@ class HubSpot_API:
         since,
         properties=None,
         limit_per_page: int = 100,
-        max_pages: t.Optional[int] = None,
-        sorts: t.Optional[t.List[dict]] = None,
-    ) -> t.List[dict]:
+        max_pages: "t.Optional[int]" = None,
+        sorts: "t.Optional[t.List[dict]]" = None,
+    ) -> "t.List[dict]":
         """
-        Busca objetos con hs_lastmodifieddate > since.
-        Intenta value en epoch ms (string), si falla reintenta ISO, y opcionalmente con 'createdate'.
+        Lee objetos con hs_lastmodifieddate > since usando /crm/v3/objects/{obj}/search.
+        - Intenta epoch-ms primero; si la página 1 falla, reintenta ISO.
+        - Para páginas >1 hace retries con backoff y si persiste el 400, corta y devuelve lo acumulado.
+        - De-duplica por id.
         """
         import datetime as dt
         import pandas as pd
+        import time
+        import json as _json
 
-        # Normaliza 'since' a datetime UTC
+        # normalizar 'since' -> datetime UTC
         if isinstance(since, (dt.datetime, dt.date)):
             if isinstance(since, dt.date) and not isinstance(since, dt.datetime):
                 since = dt.datetime.combine(since, dt.time.min, tzinfo=dt.timezone.utc)
@@ -308,76 +312,84 @@ class HubSpot_API:
         else:
             since = pd.to_datetime(since, utc=True).to_pydatetime()
 
-        since_ms = str(int(since.timestamp() * 1000))  # ← **como string**
-        since_iso = since.isoformat()                   # ← ISO 8601
+        since_ms  = str(int(since.timestamp() * 1000))
+        since_iso = since.isoformat()
 
         path = f"/crm/v3/objects/{object_type}/search"
 
-        def _run(body):
-            all_results, pages, after = [], 0, None
+        def build_body(value, use_iso: bool):
+            body = {
+                "filterGroups": [{
+                    "filters": [{
+                        "propertyName": "hs_lastmodifieddate",
+                        "operator": "GT",
+                        "value": value,  # ms-string o ISO
+                    }]
+                }],
+                "properties": properties or [],
+                "limit": limit_per_page,
+                "archived": False,
+            }
+            if sorts:
+                body["sorts"] = sorts
+            return body
+
+        def run_paged(value, use_iso: bool):
+            all_results, pages = [], 0
+            after = None
+            seen_ids = set()
+
             while True:
+                body = build_body(value, use_iso)
                 if after:
                     body["after"] = after
-                res = self._request("POST", path, json_body=body)
+
+                # retries locales por página
+                retries = 0
+                while True:
+                    try:
+                        # self._v(f"Search body (preview): {_json.dumps(body)[:800]}", level="debug")
+                        res = self._request("POST", path, json_body=body)
+                        break
+                    except Exception as e:
+                        # si estamos en la primera página y falla: repropagar (para que el caller pruebe otro formato)
+                        if pages == 0:
+                            raise
+                        # si no es primera página: backoff y reintento limitado
+                        retries += 1
+                        if retries > 2:
+                            # cortar paginación y devolver lo acumulado
+                            self._v(f"Página {pages+1} falló repetidamente ({e}); corto y devuelvo acumulado.", level="warning")
+                            return all_results
+                        time.sleep(1.5 * retries)
+
                 results = res.get("results", [])
-                all_results.extend(results)
                 pages += 1
                 self._v(f"Search página {pages}: {len(results)}", level="debug")
+
+                # de-dup por id
+                for r in results:
+                    rid = r.get("id")
+                    if rid is None or rid in seen_ids:
+                        continue
+                    seen_ids.add(rid)
+                    all_results.append(r)
+
                 after = res.get("paging", {}).get("next", {}).get("after")
-                if not after or (max_pages and pages >= max_pages):
+                if not after:
                     break
+                if max_pages and pages >= max_pages:
+                    break
+
             return all_results
 
-        # 1) Epoch ms (string) con hs_lastmodifieddate
-        body_ms = {
-            "filterGroups": [{
-                "filters": [{
-                    "propertyName": "hs_lastmodifieddate",
-                    "operator": "GT",
-                    "value": since_ms
-                }]
-            }],
-            "properties": properties or [],
-            "limit": limit_per_page,
-        }
-        if sorts: body_ms["sorts"] = sorts
+        # 1) Intento con epoch-ms
         try:
-            return _run(body_ms)
+            return run_paged(since_ms, use_iso=False)
         except Exception as e1:
-            self._v(f"Search falló con ms-string, reintentando con ISO: {e1}", level="warning")
-
-        # 2) ISO 8601 con hs_lastmodifieddate
-        body_iso = {
-            "filterGroups": [{
-                "filters": [{
-                    "propertyName": "hs_lastmodifieddate",
-                    "operator": "GT",
-                    "value": since_iso
-                }]
-            }],
-            "properties": properties or [],
-            "limit": limit_per_page,
-        }
-        if sorts: body_iso["sorts"] = sorts
-        try:
-            return _run(body_iso)
-        except Exception as e2:
-            self._v(f"Search falló con ISO, probando 'createdate' con ms-string: {e2}", level="warning")
-
-        # 3) Fallback: createdate con ms-string (para aislar problema de propiedad)
-        body_createdate = {
-            "filterGroups": [{
-                "filters": [{
-                    "propertyName": "createdate",
-                    "operator": "GT",
-                    "value": since_ms
-                }]
-            }],
-            "properties": properties or [],
-            "limit": limit_per_page,
-        }
-        if sorts: body_createdate["sorts"] = sorts
-        return _run(body_createdate)
+            # solo cambiamos a ISO si la PRIMERA página falló
+            self._v(f"Search falló en la primera página con ms-string; reintento ISO. Detalle: {e1}", level="warning")
+            return run_paged(since_iso, use_iso=True)
     # ------------------------ Wrappers por objeto ------------------------
 
     def get_contacts(
