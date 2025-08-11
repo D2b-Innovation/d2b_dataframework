@@ -293,15 +293,14 @@ class HubSpot_API:
         sorts: "t.Optional[t.List[dict]]" = None,
     ) -> "t.List[dict]":
         """
-        Lee objetos con hs_lastmodifieddate > since usando /crm/v3/objects/{obj}/search.
-        - Intenta epoch-ms primero; si la página 1 falla, reintenta ISO.
-        - Para páginas >1 hace retries con backoff y si persiste el 400, corta y devuelve lo acumulado.
+        Lee objetos con {prop_date} > since usando /crm/v3/objects/{obj}/search.
+        - Intento 1: epoch-ms (string). Si la PRIMERA página falla, reintenta con ISO.
+        - Para páginas >1: retries locales con backoff; si persiste el error, corta y devuelve lo acumulado.
         - De-duplica por id.
         """
         import datetime as dt
         import pandas as pd
         import time
-        import json as _json
 
         # normalizar 'since' -> datetime UTC
         if isinstance(since, (dt.datetime, dt.date)):
@@ -312,18 +311,23 @@ class HubSpot_API:
         else:
             since = pd.to_datetime(since, utc=True).to_pydatetime()
 
-        since_ms  = str(int(since.timestamp() * 1000))
+        since_ms  = str(int(since.timestamp() * 1000))  # HubSpot acepta ms como string
         since_iso = since.isoformat()
 
         path = f"/crm/v3/objects/{object_type}/search"
 
-        def build_body(value, use_iso: bool):
+        # Fecha a usar según objeto
+        prop_date = "hs_lastmodifieddate"
+        if object_type == "contacts":
+            prop_date = "lastmodifieddate"
+
+        def build_body(value):
             body = {
                 "filterGroups": [{
                     "filters": [{
-                        "propertyName": "hs_lastmodifieddate",
+                        "propertyName": prop_date,
                         "operator": "GT",
-                        "value": value,  # ms-string o ISO
+                        "value": value,  # <-- USAR el 'value' recibido (ms o ISO)
                     }]
                 }],
                 "properties": properties or [],
@@ -334,31 +338,28 @@ class HubSpot_API:
                 body["sorts"] = sorts
             return body
 
-        def run_paged(value, use_iso: bool):
+        def run_paged(value):
             all_results, pages = [], 0
             after = None
             seen_ids = set()
 
             while True:
-                body = build_body(value, use_iso)
+                body = build_body(value)
                 if after:
                     body["after"] = after
 
-                # retries locales por página
+                # retries locales por página (>1)
                 retries = 0
                 while True:
                     try:
-                        # self._v(f"Search body (preview): {_json.dumps(body)[:800]}", level="debug")
                         res = self._request("POST", path, json_body=body)
                         break
                     except Exception as e:
-                        # si estamos en la primera página y falla: repropagar (para que el caller pruebe otro formato)
+                        # si falla en página 0 (primera), repropagar para fallback ISO
                         if pages == 0:
                             raise
-                        # si no es primera página: backoff y reintento limitado
                         retries += 1
                         if retries > 2:
-                            # cortar paginación y devolver lo acumulado
                             self._v(f"Página {pages+1} falló repetidamente ({e}); corto y devuelvo acumulado.", level="warning")
                             return all_results
                         time.sleep(1.5 * retries)
@@ -383,13 +384,12 @@ class HubSpot_API:
 
             return all_results
 
-        # 1) Intento con epoch-ms
+        # Intento 1: epoch-ms; si la PRIMERA página falla, reintento ISO
         try:
-            return run_paged(since_ms, use_iso=False)
+            return run_paged(since_ms)
         except Exception as e1:
-            # solo cambiamos a ISO si la PRIMERA página falló
             self._v(f"Search falló en la primera página con ms-string; reintento ISO. Detalle: {e1}", level="warning")
-            return run_paged(since_iso, use_iso=True)
+            return run_paged(since_iso)
     # ------------------------ Wrappers por objeto ------------------------
 
     def get_contacts(
