@@ -286,96 +286,98 @@ class HubSpot_API:
     def search_objects_updated_since(
         self,
         object_type: str,
-        since: t.Union[str, dt.datetime, dt.date],
-        properties: t.Optional[t.List[str]] = None,
+        since,
+        properties=None,
         limit_per_page: int = 100,
         max_pages: t.Optional[int] = None,
         sorts: t.Optional[t.List[dict]] = None,
     ) -> t.List[dict]:
         """
-        Busca objetos filtrando por fecha de última modificación (hs_lastmodifieddate > since).
-        Usa POST /crm/v3/objects/{object_type}/search
-
-        ARGS
-        ----
-        object_type : str
-            'contacts', 'companies', 'deals', etc.
-        since : str | datetime | date
-            Fecha/hora ISO compatible. Si es date/datetime se convierte a ISO (UTC).
-        properties : list[str] | None
-            Propiedades a incluir en la respuesta.
-        limit_per_page : int
-            Tamaño de página (máx. típico 100).
-        max_pages : int | None
-            Límite de páginas a recorrer.
-        sorts : list[dict] | None
-            Ordenamientos (por ejemplo [{'propertyName':'hs_lastmodifieddate','direction':'ASCENDING'}]).
-
-        RETURNS
-        -------
-        list[dict]
+        Busca objetos con hs_lastmodifieddate > since.
+        Intenta value en epoch ms (string), si falla reintenta ISO, y opcionalmente con 'createdate'.
         """
-        path = f"/crm/v3/objects/{object_type}/search"
+        import datetime as dt
+        import pandas as pd
 
-        # Normaliza fecha a ISO milisegundos
+        # Normaliza 'since' a datetime UTC
         if isinstance(since, (dt.datetime, dt.date)):
             if isinstance(since, dt.date) and not isinstance(since, dt.datetime):
-                since = dt.datetime.combine(since, dt.time.min)
-            # HubSpot espera milis desde epoch o ISO? El search acepta filter con 'value' como string ISO o epoch ms.
-            # Usaremos ISO Zulu.
-            since_iso = since.replace(tzinfo=dt.timezone.utc).isoformat()
+                since = dt.datetime.combine(since, dt.time.min, tzinfo=dt.timezone.utc)
+            elif since.tzinfo is None:
+                since = since.replace(tzinfo=dt.timezone.utc)
         else:
-            # Asumimos string ISO válido
-            since_iso = since
+            since = pd.to_datetime(since, utc=True).to_pydatetime()
 
-        filter_groups = [
-            {
-                "filters": [
-                    {
-                        "propertyName": "hs_lastmodifieddate",
-                        "operator": "GT",
-                        "value": since_iso,
-                    }
-                ]
-            }
-        ]
+        since_ms = str(int(since.timestamp() * 1000))  # ← **como string**
+        since_iso = since.isoformat()                   # ← ISO 8601
 
-        if properties is None:
-            properties = []
+        path = f"/crm/v3/objects/{object_type}/search"
 
-        body = {
-            "filterGroups": filter_groups,
-            "properties": properties,
+        def _run(body):
+            all_results, pages, after = [], 0, None
+            while True:
+                if after:
+                    body["after"] = after
+                res = self._request("POST", path, json_body=body)
+                results = res.get("results", [])
+                all_results.extend(results)
+                pages += 1
+                self._v(f"Search página {pages}: {len(results)}", level="debug")
+                after = res.get("paging", {}).get("next", {}).get("after")
+                if not after or (max_pages and pages >= max_pages):
+                    break
+            return all_results
+
+        # 1) Epoch ms (string) con hs_lastmodifieddate
+        body_ms = {
+            "filterGroups": [{
+                "filters": [{
+                    "propertyName": "hs_lastmodifieddate",
+                    "operator": "GT",
+                    "value": since_ms
+                }]
+            }],
+            "properties": properties or [],
             "limit": limit_per_page,
         }
-        if sorts:
-            body["sorts"] = sorts
+        if sorts: body_ms["sorts"] = sorts
+        try:
+            return _run(body_ms)
+        except Exception as e1:
+            self._v(f"Search falló con ms-string, reintentando con ISO: {e1}", level="warning")
 
-        all_results: t.List[dict] = []
-        pages = 0
-        after = None
+        # 2) ISO 8601 con hs_lastmodifieddate
+        body_iso = {
+            "filterGroups": [{
+                "filters": [{
+                    "propertyName": "hs_lastmodifieddate",
+                    "operator": "GT",
+                    "value": since_iso
+                }]
+            }],
+            "properties": properties or [],
+            "limit": limit_per_page,
+        }
+        if sorts: body_iso["sorts"] = sorts
+        try:
+            return _run(body_iso)
+        except Exception as e2:
+            self._v(f"Search falló con ISO, probando 'createdate' con ms-string: {e2}", level="warning")
 
-        while True:
-            if after:
-                body["after"] = after
-            res = self._request("POST", path, json_body=body)
-            results = res.get("results", [])
-            all_results.extend(results)
-            pages += 1
-
-            self._v(f"Search página {pages}: {len(results)} registros (acum: {len(all_results)})", level="debug")
-
-            paging = res.get("paging", {})
-            next_link = paging.get("next", {})
-            after = next_link.get("after")
-
-            if not after:
-                break
-            if max_pages and pages >= max_pages:
-                break
-
-        return all_results
-
+        # 3) Fallback: createdate con ms-string (para aislar problema de propiedad)
+        body_createdate = {
+            "filterGroups": [{
+                "filters": [{
+                    "propertyName": "createdate",
+                    "operator": "GT",
+                    "value": since_ms
+                }]
+            }],
+            "properties": properties or [],
+            "limit": limit_per_page,
+        }
+        if sorts: body_createdate["sorts"] = sorts
+        return _run(body_createdate)
     # ------------------------ Wrappers por objeto ------------------------
 
     def get_contacts(
