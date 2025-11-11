@@ -23,6 +23,39 @@ class Google_GA4():
     self.unsampled     = unsampled
     self.intraday_limit = intraday_limit*100000
 
+  def _extract_sampling_info(self, raw_server_response):
+      '''
+      Extrae información de sampling del response de GA4
+      ARGS
+      raw_server_response <dict> Response crudo del API
+      RETURN
+      <dict> Diccionario con info de sampling
+      '''
+      response = raw_server_response.get("reports")[0]
+      
+      sampling_info = {
+          'samplesReadCounts': None,
+          'samplingSpaceSizes': None,
+          'sampling_percentage': None
+      }
+      
+      # Extraer datos de sampling si existen
+      if 'metadata' in response:
+          metadata = response['metadata']
+          if 'samplesReadCounts' in metadata:
+              sampling_info['samplesReadCounts'] = metadata['samplesReadCounts'][0]
+          if 'samplingSpaceSizes' in metadata:
+              sampling_info['samplingSpaceSizes'] = metadata['samplingSpaceSizes'][0]
+          
+          # Calcular porcentaje de sampling
+          if sampling_info['samplesReadCounts'] and sampling_info['samplingSpaceSizes']:
+              sampling_info['sampling_percentage'] = (
+                  int(sampling_info['samplesReadCounts']) / 
+                  int(sampling_info['samplingSpaceSizes']) * 100
+              )
+      
+      return sampling_info
+
 
   def get_service(self):
     '''
