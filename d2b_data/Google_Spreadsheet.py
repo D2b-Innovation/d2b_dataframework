@@ -52,7 +52,7 @@ class Google_Spreadsheet:
     print('Data eliminada')
     return True
 
-  def update_data(self, spreadsheet_id, range_index, list):
+  def update_data(self, spreadsheet_id, range_index, data_list):
     '''
     Esta funcion permite insertar data en un rango.
     @spreadsheet_id representa el valor de la url que se encuentra despues del '/d/' y despues de '/edit#gid=0', este valor
@@ -66,9 +66,9 @@ class Google_Spreadsheet:
         'Sheet2!A1'
 
 
-    @list es la lista(array=[[]]) de data que se va a agregar.
+    @data_list es la lista(array=[[]]) de data que se va a agregar.
     '''
-    body_request = {'values': list}
+    body_request = {'values': data_list}
     self.service.spreadsheets().values().update(spreadsheetId=spreadsheet_id, range=range_index, valueInputOption='USER_ENTERED', body= body_request).execute()
     print('Data agregada')
     return True
