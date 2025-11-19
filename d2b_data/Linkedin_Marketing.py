@@ -179,7 +179,7 @@ class Linkedin_Marketing():
         return name_map
 
     except Exception as e:
-        logger.critical(f"No se pudieron obtener los nombres de las campañas. Error: {e}")
+        logger.log(f"No se pudieron obtener los nombres de las campañas. Error: {e}")
         return {}
         
   def get_campaign_group_names(self, group_ids):
