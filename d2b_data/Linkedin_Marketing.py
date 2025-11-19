@@ -206,6 +206,6 @@ class Linkedin_Marketing():
         logger.log(f"Se encontraron {len(name_map)} nombres de grupos de campaña.")
         return name_map
     except Exception as e:
-        logger.critical(f"No se pudieron obtener los nombres de los grupos de campaña. Error: {e}")
+        logger.log(f"No se pudieron obtener los nombres de los grupos de campaña. Error: {e}")
         return {}
 
