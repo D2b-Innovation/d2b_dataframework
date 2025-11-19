@@ -184,28 +184,38 @@ class Linkedin_Marketing():
         
   def get_campaign_group_names(self, group_ids):
     """
-    Toma una lista de IDs de Grupos de Campaña y devuelve un diccionario mapeando cada ID a su nombre.
+    Toma una lista de IDs de Grupos de Campaña y devuelve un diccionario 
+    mapeando cada ID a su nombre, usando el método de batch get.
     """
     logger = self.verbose_logger
     if not group_ids:
         return {}
 
-    ids_for_query = ",".join([str(int(id)) for id in group_ids])
-    search_query = f"search=(id:(values:List({ids_for_query})))"
+    # URL base para grupos de campaña
+    base_url = "https://api.linkedin.com/v2/adCampaignGroupsV2"
     
-    # El endpoint para los Grupos de Campaña
-    url = f"https://api.linkedin.com/v2/adCampaignGroupsV2?q={quote(search_query)}&fields=id,name"
+    # Parámetros - requests los formateará correctamente
+    params = {
+        'ids': [int(id) for id in group_ids],
+        'fields': 'id,name'
+    }
     
-    logger.log(f"Consultando nombres para {len(group_ids)} grupos de campaña...")
+    logger.log(f"Consultando nombres para {len(group_ids)} grupos de campaña usando batch get...")
     
     try:
-        res = requests.get(url, headers=self.HEADERS)
+        res = requests.get(base_url, headers=self.HEADERS, params=params)
         res.raise_for_status()
-        data = res.json().get('elements', [])
-        name_map = {item['id']: item['name'] for item in data}
+        
+        # La respuesta para batch get usa 'results' como en campaigns
+        data = res.json().get('results', {})
+        
+        # Mapeo: {id: nombre}
+        name_map = {int(id_str): details['name'] for id_str, details in data.items()}
+        
         logger.log(f"Se encontraron {len(name_map)} nombres de grupos de campaña.")
         return name_map
+
     except Exception as e:
-        logger.critical(f"No se pudieron obtener los nombres de los grupos de campaña. Error: {e}")
+        logger.log(f"ADVERTENCIA: No se pudieron obtener los nombres de los grupos de campaña. Error: {e}")
         return {}
 
