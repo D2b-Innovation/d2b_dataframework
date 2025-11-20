@@ -37,10 +37,10 @@ class Linkedin_Marketing():
     start_url = f"&dateRange.start.day={start_parts[2]}&dateRange.start.month={start_parts[1]}&dateRange.start.year={start_parts[0]}"
     end_parts   = end.split("-")
     end_url   = f"&dateRange.end.day={end_parts[2]}&dateRange.end.month={end_parts[1]}&dateRange.end.year={end_parts[0]}"
-    
+
     if pivot and "pivot" not in metrics:
         metrics += ",pivot,pivotValues"
-    
+
     pivot_text = ''
     if pivot:
       for idx, val in enumerate(pivot.split(",")):
@@ -48,9 +48,9 @@ class Linkedin_Marketing():
 
     url = (f'https://api.linkedin.com/v2/adAnalyticsV2?q=statistics&{pivot_text}'
            f'timeGranularity={time_granularity}{start_url}{end_url}&accounts={account_id_encoded}&fields={metrics}')
-    
+
     if self.verbose_logger: self.verbose_logger.log(f"Ejecutando GET a URL: {url}")
-        
+
     res = requests.get(url, headers=self.HEADERS)
     if res.status_code != 200:
         error_content = res.content.decode()
@@ -96,7 +96,7 @@ class Linkedin_Marketing():
     project_id = bq_config["project-id"]
     dataset = bq_config["dataset"]
     table_prefix = bq_config["table-prefix"]
-    
+
     credentials_gbq = service_account.Credentials.from_service_account_info(credentials_info)
 
     # Iterar por cada fecha única en el DataFrame
@@ -108,13 +108,13 @@ class Linkedin_Marketing():
         date_suffix = single_date.strftime('%Y%m%d')
         destination_table_name = f"{table_prefix}_{date_suffix}"
         full_destination_table = f"{dataset}.{destination_table_name}"
-        
+
         # Filtrar el DataFrame para obtener solo los datos de este día
         df_for_day = df[df['date'].dt.date == single_date].copy()
 
         # Antes de subir, formateamos la columna 'date' a string para evitar errores
         df_for_day['date'] = df_for_day['date'].dt.strftime('%Y-%m-%d')
-        
+
         logger.log(f"Subiendo {len(df_for_day)} filas para la fecha {single_date.strftime('%Y-%m-%d')} a la tabla {full_destination_table}")
 
         try:
@@ -154,37 +154,37 @@ class Linkedin_Marketing():
 
     # La URL base para la consulta de campañas
     base_url = "https://api.linkedin.com/v2/adCampaignsV2"
-    
+
     # Parámetros para la petición. La librería 'requests' se encargará de
     # formatearlo correctamente como: ?ids=123&ids=456...
     params = {
         'ids': [int(id) for id in campaign_ids],
         'fields': 'id,name'
     }
-    
+
     logger.log(f"Consultando nombres para {len(campaign_ids)} campañas usando batch get...")
-    
+
     try:
         res = requests.get(base_url, headers=self.HEADERS, params=params)
         res.raise_for_status() # Lanza un error si la petición falla (ej. 4xx, 5xx)
-        
+
         # La respuesta para un batch get es un diccionario donde las claves son los IDs
         data = res.json().get('results', {})
-        
+
         # Creamos el diccionario de mapeo: {12345: "Mi Campaña", ...}
         # Hay que convertir la clave (que viene como string) a integer para que coincida
         name_map = {int(id_str): details['name'] for id_str, details in data.items()}
-        
+
         logger.log(f"Se encontraron {len(name_map)} nombres de campañas.")
         return name_map
 
     except Exception as e:
         logger.log(f"No se pudieron obtener los nombres de las campañas. Error: {e}")
         return {}
-        
+
   def get_campaign_group_names(self, group_ids):
     """
-    Toma una lista de IDs de Grupos de Campaña y devuelve un diccionario 
+    Toma una lista de IDs de Grupos de Campaña y devuelve un diccionario
     mapeando cada ID a su nombre, usando el método de batch get.
     """
     logger = self.verbose_logger
@@ -193,29 +193,28 @@ class Linkedin_Marketing():
 
     # URL base para grupos de campaña
     base_url = "https://api.linkedin.com/v2/adCampaignGroupsV2"
-    
+
     # Parámetros - requests los formateará correctamente
     params = {
         'ids': [int(id) for id in group_ids],
         'fields': 'id,name'
     }
-    
+
     logger.log(f"Consultando nombres para {len(group_ids)} grupos de campaña usando batch get...")
-    
+
     try:
         res = requests.get(base_url, headers=self.HEADERS, params=params)
         res.raise_for_status()
-        
+
         # La respuesta para batch get usa 'results' como en campaigns
         data = res.json().get('results', {})
-        
+
         # Mapeo: {id: nombre}
         name_map = {int(id_str): details['name'] for id_str, details in data.items()}
-        
+
         logger.log(f"Se encontraron {len(name_map)} nombres de grupos de campaña.")
         return name_map
 
     except Exception as e:
         logger.log(f"ADVERTENCIA: No se pudieron obtener los nombres de los grupos de campaña. Error: {e}")
         return {}
-
