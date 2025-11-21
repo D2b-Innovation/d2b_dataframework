@@ -9,6 +9,7 @@ from google.oauth2 import service_account
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
+
 class Linkedin_Marketing():
   def __init__(self, APPLICATON_KEY, APPLICATON_SECRET):
     self.APPLICATON_KEY    = APPLICATON_KEY
