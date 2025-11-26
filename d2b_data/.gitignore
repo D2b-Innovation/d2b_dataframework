@@ -1,0 +1,39 @@
+# ------------------------------------
+# Archivos/Directorios Generales de Git
+# ------------------------------------
+# Logs, bases de datos o directorios de build
+/dist
+/build
+/log
+*.log
+
+# ------------------------------------
+# macOS
+# ------------------------------------
+# Ignorar el archivo de configuración de vista de carpetas
+.DS_Store
+
+# Ignorar archivos de recursos
+._*
+
+# Ignorar índices de búsqueda y eventos
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# ------------------------------------
+# Entornos Virtuales Python
+# ------------------------------------
+# Carpetas de entornos virtuales (Conda, venv, poetry)
+venv/
+.venv/
+__pycache__/
+
+# ------------------------------------
+# IDEs Comunes
+# ------------------------------------
+# VSCode
+.vscode/
+
+# JetBrains IDEs (PyCharm, etc.)
+.idea/
