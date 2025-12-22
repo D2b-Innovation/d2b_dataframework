@@ -9,8 +9,10 @@ class Google_Spreadsheet:
     self.credentials_path = credentials_path
     self.url_id  = url_id
     if use_service_account:
+        with open(credentials_path, 'r') as f:
+            creds_json = json.load(f)
         self.cre = service_account.Credentials.from_service_account_file(
-            credentials_path, 
+            creds_json, 
             scopes=['https://www.googleapis.com/auth/spreadsheets']                                                                         
           )
     else: 
