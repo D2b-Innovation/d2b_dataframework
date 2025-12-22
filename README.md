@@ -1,88 +1,106 @@
-```markdown
-# D2B Data Framework
+## 1. Contenido para tu `README.md`
 
-A Python framework for managing and integrating data operations across various platforms like Google Analytics, BigQuery, Google Spreadsheets, and multiple marketing platforms. This project offers modular and reusable classes to streamline data handling.
+Copia todo este bloque y pégalo dentro de tu archivo `README.md` (reemplazando lo que tengas):
+
+```markdown
+# D2B Data Framework 🚀
+
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Organization](https://img.shields.io/badge/Org-D2b--Innovation-black.svg)](https://github.com/D2b-Innovation)
+
+A robust Python framework designed for managing and integrating data operations across multiple marketing and analytics platforms. D2B Data Framework provides modular, reusable classes to streamline ETL processes and data handling.
 
 ---
 
-## Installation
-
-You can install the project in two ways:
+## 🛠 Installation
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/d2b_dataframework.git
+git clone [https://github.com/D2b-Innovation/d2b_dataframework.git](https://github.com/D2b-Innovation/d2b_dataframework.git)
 cd d2b_dataframework
-pip install -r requirements_old.txt
+pip install -r requirements.txt
+
 ```
 
-### 2. Install via `pip`
-To install the package directly from GitHub:
+### 2. Install via `pip` (Directly from GitHub)
+
 ```bash
-pip install git+https://github.com/yourusername/d2b_dataframework.git
+pip install git+[https://github.com/D2b-Innovation/d2b_dataframework.git](https://github.com/D2b-Innovation/d2b_dataframework.git)
+
 ```
 
 ---
 
-## Modules and Classes
+## 📦 Modules and Capabilities
 
-The framework contains the following modules and their respective classes:
-
-### `d2b_data`
-- **`Facebook_Marketing`**: `Facebook_Marketing`
-- **`Google_Analytics`**: `Google_Analytics`
-- **`Google_Bigquery`**: `Google_Bigquery`
-- **`Google_GA4`**: `Google_GA4`
-- **`Google_Spreadsheet`**: `Google_Spreadsheet`
-- **`Google_Token_MNG`**: `Google_Token_MNG`
-- **`Linkedin_Marketing`**: `Linkedin_Marketing`
-- **`Tiktok_marketing`**: `Tiktok`
-- **`X_ads`**: `X_ads`
-
-These modules allow interaction with their respective platforms, providing tools for:
-- Data retrieval and reporting.
-- API integration for marketing and analytics platforms.
-- Managing tokens and credentials for Google APIs.
+| Module | Main Class | Description |
+| --- | --- | --- |
+| 🔵 **Facebook** | `Facebook_Marketing` | Manage Ads Insights and campaign data. |
+| 📊 **GA4** | `Google_GA4` | Fetch reports and real-time analytics data. |
+| ☁️ **BigQuery** | `Google_Bigquery` | Streamline SQL queries and data uploads. |
+| 📈 **Google Analytics** | `Google_Analytics` | Legacy Universal Analytics support. |
+| 📝 **Sheets** | `Google_Spreadsheet` | Read/Write operations on Google Sheets. |
+| 🔑 **Auth** | `Google_Token_MNG` | Manage OAuth2 tokens and credentials. |
+| 💼 **LinkedIn** | `Linkedin_Marketing` | Extract B2B marketing performance metrics. |
+| 🎵 **TikTok** | `Tiktok` | Integration with TikTok Ads API. |
+| 🐦 **X (Twitter)** | `X_ads` | Handle X Ads data reporting. |
 
 ---
 
-## Usage
-
-Import the required module and initialize its main class. Below is an example for using the `Google_GA4` module:
+## 🚀 Quick Start (Usage)
 
 ```python
 from d2b_data.Google_GA4 import Google_GA4
 
-# Initialize Google_GA4 with credentials
+# 1. Initialize the client
 ga4_client = Google_GA4('client_secret.json', 'token.json')
 
-# Fetch real-time analytics data
-report = ga4_client.get_report_df('properties/YOUR_PROPERTY_ID', query, realtime=True)
+# 2. Fetch data
+property_id = 'properties/YOUR_PROPERTY_ID'
+query = { "dimensions": [{"name": "city"}], "metrics": [{"name": "activeUsers"}] }
+
+df = ga4_client.get_report_df(property_id, query, realtime=True)
+print(df.head())
+
 ```
 
-Replace the module name and class as per your needs.
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License**.
+
+## 🤝 Contributing
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
-## License
+### 2. Comandos para la Terminal
+Una vez que hayas guardado el `README.md`, abre la terminal en esa carpeta y ejecuta esto (una línea tras otra):
 
-This project is licensed under the terms of the MIT License. See the [LICENSE](LICENSE) file for details.
+```bash
+# Inicializar el repositorio
+git init
 
----
+# Agregar todos los archivos (incluyendo el nuevo README)
+git add .
 
-## Contributing
+# Crear el commit inicial
+git commit -m "Initial commit: Migration to GitHub with updated README"
 
-Feel free to fork the repository and submit pull requests for new features or bug fixes.
+# Vincular con GitHub usando tu alias de SSH laboral (github.com-d2b)
+git remote add origin git@github.com-d2b:D2b-Innovation/d2b_dataframework.git
 
----
+# Renombrar rama a main y subir la información
+git branch -M main
+git push -u origin main
 
-## Support
-
-For support, please open an issue in this repository.
-
----
-
-Happy coding! 🚀
 ```
 
-Make sure to update the placeholder GitHub URL (`https://github.com/yourusername/d2b_dataframework.git`) with the actual repository URL. Let me know if you need further adjustments!
+**¿Te funcionó el push o te arrojó algún mensaje de error al final?**
