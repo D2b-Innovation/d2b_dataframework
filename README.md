@@ -1,8 +1,3 @@
-## 1. Contenido para tu `README.md`
-
-Copia todo este bloque y pégalo dentro de tu archivo `README.md` (reemplazando lo que tengas):
-
-```markdown
 # D2B Data Framework 🚀
 
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
