@@ -1,15 +1,23 @@
 from googleapiclient.discovery import build
 import pandas as pd
 from oauth2client import client
+from google.oauth2 import service_account
 import json
 
 class Google_Spreadsheet:
-  def __init__(self,token,url_id=None):
-    self.token   = token
+  def __init__(self, credentials_path, url_id=None, use_service_account=False):
+    self.credentials_path = credentials_path
     self.url_id  = url_id
-    with open(token, 'r') as f:
-        creds_json = json.load(f)
-    self.cre = client.Credentials.new_from_json(creds_json)
+    if use_service_account:
+        self.cre = service_account.Credentials.from_service_account_file(
+            credentials_path, 
+            scopes=['https://www.googleapis.com/auth/spreadsheets']                                                                         
+          )
+    else: 
+        with open(credentials_path, 'r') as f:
+            creds_json = json.load(f)
+        self.cre = client.Credentials.new_from_json(creds_json)
+    
     self.service = build('sheets', 'v4', credentials=self.cre)
 
   def get_spreadsheet(self):
