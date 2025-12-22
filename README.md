@@ -75,27 +75,3 @@ This project is licensed under the **MIT License**.
 5. Open a Pull Request
 
 ---
-
-### 2. Comandos para la Terminal
-Una vez que hayas guardado el `README.md`, abre la terminal en esa carpeta y ejecuta esto (una línea tras otra):
-
-```bash
-# Inicializar el repositorio
-git init
-
-# Agregar todos los archivos (incluyendo el nuevo README)
-git add .
-
-# Crear el commit inicial
-git commit -m "Initial commit: Migration to GitHub with updated README"
-
-# Vincular con GitHub usando tu alias de SSH laboral (github.com-d2b)
-git remote add origin git@github.com-d2b:D2b-Innovation/d2b_dataframework.git
-
-# Renombrar rama a main y subir la información
-git branch -M main
-git push -u origin main
-
-```
-
-**¿Te funcionó el push o te arrojó algún mensaje de error al final?**
