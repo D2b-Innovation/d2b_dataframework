@@ -58,6 +58,7 @@ class ProphetForecaster:
         df_final_cols = new_date + metrics_in_df
         prophet_dataframe = prophet_dataframe[df_final_cols]
         self.df_ready = prophet_dataframe
+        
 
     def get_forecast(self, days):
         """Generates forecasts for the specified metrics using Prophet.
@@ -92,7 +93,7 @@ class ProphetForecaster:
                 results = forecast_clean
             else:
                 results = pd.merge(forecast_clean, results, on='date', how='outer')
-            print(f" Forecast para {metric} por {days} listo")
+            print(f" Forecast para {metric} por {days} días listo")
         self.df_postpredict = results.sort_values('date').round()
 
         print(f" Forecast ready for {self.df_postpredict.columns.to_list()}")
