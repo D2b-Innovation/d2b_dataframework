@@ -27,14 +27,24 @@ class ProphetForecaster:
         """
         date_options = ['date', 'fecha']
 
-        metrics_in_df = [col for col in df_topredict.columns if col not in date_options]
         date_in_df = [col for col in df_topredict.columns if col in date_options]
-        prophet_dataframe = df_topredict.copy()
-
         if not date_in_df:
             raise ValueError("No date columns found in the DataFrame. Please upload a 'date' or 'fecha' column.")
-
         date_to_predict = date_in_df[0]
+
+        metrics_in_df = [col for col in df_topredict.columns if col not in date_options]
+
+        prophet_dataframe = df_topredict.copy()
+
+        # 3. Strict Type Checking
+        for col in metrics_in_df:
+            if not pd.api.types.is_numeric_dtype(prophet_dataframe[col]):
+                raise TypeError(
+                    f"\n[INTEGRITY ERROR]: Column '{col}' contains string or non-numeric data.\n"
+                    f"Prophet requires numeric values to forecast. Please remove dimensions "
+                    f"(like keywords, pages, or categories) and only pass date and numeric metrics."
+                )
+
         prophet_dataframe[date_to_predict] = pd.to_datetime(prophet_dataframe[date_to_predict], format='%Y-%m-%d')
         prophet_dataframe.rename(columns={date_to_predict: 'ds'}, inplace=True)
         print( f" Using {date_to_predict} as date column")
@@ -48,8 +58,6 @@ class ProphetForecaster:
         df_final_cols = new_date + metrics_in_df
         prophet_dataframe = prophet_dataframe[df_final_cols]
         self.df_ready = prophet_dataframe
-
-
 
     def get_forecast(self, days):
         """Generates forecasts for the specified metrics using Prophet.
