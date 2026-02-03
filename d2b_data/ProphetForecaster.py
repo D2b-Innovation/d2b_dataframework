@@ -1,5 +1,8 @@
 import pandas as pd
 from prophet import Prophet
+import pickle
+import os
+from pathlib import Path
 
 
 # Aquí agregamos los imports que vamos a usar
@@ -99,3 +102,104 @@ class ProphetForecaster:
         print(f" Forecast ready for {self.df_postpredict.columns.to_list()}")
         return self.df_postpredict
         
+    def save_models(self, directory='prophet_models'):
+        """Guarda todos los modelos entrenados en archivos pickle.
+        
+        Args:
+            directory (str): Directorio donde se guardarán los modelos.
+                           Por defecto crea una carpeta 'prophet_models'.
+        
+        Returns:
+            dict: Diccionario con las rutas de los archivos guardados.
+        """
+        if not self.models:
+            raise ValueError("No hay modelos entrenados. Ejecuta get_forecast() primero.")
+        
+        # Crear directorio si no existe
+        Path(directory).mkdir(parents=True, exist_ok=True)
+        
+        saved_files = {}
+        
+        for metric, model in self.models.items():
+            filename = f"{metric}_model.pkl"
+            filepath = os.path.join(directory, filename)
+            
+            with open(filepath, 'wb') as f:
+                pickle.dump(model, f)
+            
+            saved_files[metric] = filepath
+            print(f" Modelo para '{metric}' guardado en: {filepath}")
+        
+        print(f"\n✓ {len(saved_files)} modelos guardados exitosamente")
+        return saved_files
+    
+    def load_models(self, directory='prophet_models', metrics=None):
+        """Carga modelos previamente guardados desde archivos pickle.
+        
+        Args:
+            directory (str): Directorio donde están guardados los modelos.
+            metrics (list, optional): Lista de métricas específicas a cargar.
+                                    Si es None, carga todos los modelos disponibles.
+        
+        Returns:
+            dict: Diccionario con los modelos cargados.
+        """
+        if not os.path.exists(directory):
+            raise FileNotFoundError(f"El directorio '{directory}' no existe.")
+        
+        # Si no se especifican métricas, cargar todos los archivos .pkl
+        if metrics is None:
+            model_files = [f for f in os.listdir(directory) if f.endswith('_model.pkl')]
+            metrics = [f.replace('_model.pkl', '') for f in model_files]
+        
+        loaded_models = {}
+        
+        for metric in metrics:
+            filename = f"{metric}_model.pkl"
+            filepath = os.path.join(directory, filename)
+            
+            if not os.path.exists(filepath):
+                print(f"⚠ Advertencia: No se encontró el modelo para '{metric}' en {filepath}")
+                continue
+            
+            with open(filepath, 'rb') as f:
+                model = pickle.load(f)
+            
+            loaded_models[metric] = model
+            print(f" Modelo para '{metric}' cargado desde: {filepath}")
+        
+        self.models = loaded_models
+        print(f"\n✓ {len(loaded_models)} modelos cargados exitosamente")
+        return loaded_models
+    
+    def predict_from_loaded_models(self, days):
+        """Genera predicciones usando modelos previamente cargados.
+        
+        Args:
+            days (int): Número de días a predecir.
+        
+        Returns:
+            DataFrame: DataFrame con las predicciones.
+        """
+        if not self.models:
+            raise ValueError("No hay modelos cargados. Usa load_models() primero.")
+        
+        results = pd.DataFrame()
+        
+        for metric, model in self.models.items():
+            print(f" Prediciendo con modelo cargado: {metric}...")
+            
+            future = model.make_future_dataframe(periods=days)
+            forecast = model.predict(future)
+            forecast_clean = forecast[['ds', 'yhat']].rename(columns={'ds': 'date', 'yhat': metric})
+            
+            if results.empty:
+                results = forecast_clean
+            else:
+                results = pd.merge(forecast_clean, results, on='date', how='outer')
+            
+            print(f" Predicción para {metric} completada")
+        
+        self.df_postpredict = results.sort_values('date').round()
+        print(f"\n✓ Predicciones listas para {self.df_postpredict.columns.to_list()}")
+        return self.df_postpredict
