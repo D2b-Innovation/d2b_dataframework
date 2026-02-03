@@ -3,11 +3,14 @@ import json
 import webbrowser
 import httplib2
 import os
+import random
+import time
 import datetime
 import d2b_data.Google_Token_MNG 
 
 from datetime import timedelta, datetime
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from oauth2client import client
 from builtins import input
 from google_auth_oauthlib import flow
@@ -149,9 +152,59 @@ class Google_GA4():
             print(message)
 
     def _get_report_raw(self, property_id, query):
-        '''Ejecuta query raw contra GA4 API'''
-        response = self.service.properties().batchRunReports(property=property_id, body=query).execute()
-        return response
+        '''
+        Ejecuta query raw contra GA4 API con Exponential Backoff + Jitter
+        Maneja errores 429 (Quota) y 5xx (Server Errors)
+        '''
+        max_retries = 5
+        retry_count = 0
+
+        while True:
+            try:
+                # Intentamos ejecutar la llamada a la API (método antiguo)
+                response = self.service.properties().batchRunReports(
+                    property=property_id, 
+                    body=query
+                    ).execute()
+                return response
+            
+            except HttpError as e:
+                # Capturamos el error estructurado de Google
+                status_code = e.resp.status
+                reason = e._get_reason()
+                # Lista de errores que merecen reintento:
+                # 429: Too Many Requests (problema actual)
+                # 500, 503: Errores internos de Google (a veces pasan)
+                if status_code in [429, 500, 503]:
+                    if retry_count >= max_retries:
+                        self.debug(f" Error {status_code} ({reason}): Se agotaron los {max_retries} reintentos.")
+                        raise e 
+
+                    sleep_time = (2 ** retry_count) + random.uniform(0, 1)
+
+                    self.debug(f" Error {status_code}. Reintento {retry_count + 1}/{max_retries}. Esperando {sleep_time:.2f}s...")
+                    time.sleep(sleep_time)
+                    retry_count += 1
+                else:
+                    self.debug(f" Error no recuperable {status_code}: {reason}")
+                    raise e
+                
+            except Exception as e:
+                # Catch-all por si ocurre un error de conexión socket o algo fuera de HttpError
+                # Si el mensaje contiene 429, aplicamos la misma lógica "sucia" po
+                error_str = str(e)      
+                if "429" in str(e):
+                    if retry_count >= max_retries: 
+                        raise e
+                    
+                    sleep_time = (2 ** retry_count) + random.uniform(0, 1)
+                    self.debug(f" Error genérico detectad (posible 429). Esperando {sleep_time:.2f} s...")
+                    
+                    time.sleep(sleep_time)
+                    retry_count += 1
+                else:
+                    raise e
+
 
     def get_report_df(self, property_id, query, extract_sampling=None):
         '''
