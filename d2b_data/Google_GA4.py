@@ -113,35 +113,18 @@ class Google_GA4():
         RETURNS
         <googleapiclient.discovery.Resource> Objeto service de GA4
         """
-        if use_service_account:
-            try:
-                creds = service_account.Credentials.from_service_account_file(
-                    secrets,
-                    scopes=['https://www.googleapis.com/auth/analytics.readonly']
-                )
-                service = build(
-                    self.default_api_name, 
-                    self.default_version, 
-                    credentials=creds,
-                    cache_discovery=False # Recomendado para evitar warnings en logs
-                )
-                self.debug("Conectado a GA4 vía Service Account")
-                return service
-            except Exception as e:
-                self.debug(f"Error conectando con Service Account: {str(e)}")
-                raise e
-        else:
-
-            token_mng = d2b_data.Google_Token_MNG.Google_Token_MNG(
-                secrets,
-                credentials,
-                scopes=['https://www.googleapis.com/auth/analytics.readonly'],
-                api_version=self.default_version,
-                api_name=self.default_api_name
-            )
-            self.service = token_mng.get_service()
-            self.debug("Conectado a GA4")
-            return self.service
+        token_mng = d2b_data.Google_Token_MNG.Google_Token_MNG(
+            client_secret=secrets,  # Si es SA, esto es la ruta al JSON key
+            token=credentials,      # Si es SA, esto puede ser None
+            scopes=['https://www.googleapis.com/auth/analytics.readonly'],
+            api_version=self.default_version,
+            api_name=self.default_api_name,
+            use_service_account=use_service_account # <--- ¡Aquí está la magia!
+        )
+        
+        self.service = token_mng.get_service()
+        self.debug("Conectado a GA4")
+        return self.service
 
     def _to_DF(self, raw_server_response):
         '''

@@ -1,4 +1,5 @@
 from googleapiclient.discovery import build
+from d2b_data.Google_Token_MNG import Google_Token_MNG
 import pandas as pd
 from oauth2client import client
 from google.oauth2 import service_account
@@ -8,40 +9,48 @@ class Google_Spreadsheet:
   def __init__(self, credentials_path, url_id=None, use_service_account=False):
     self.credentials_path = credentials_path
     self.url_id  = url_id
-    if use_service_account:
-        self.cre = service_account.Credentials.from_service_account_file(self.credentials_path, 
-            scopes=['https://www.googleapis.com/auth/spreadsheets']                                                                         
-          )
-    else: 
-        with open(credentials_path, 'r') as f:
-            creds_json = json.load(f)
-        self.cre = client.Credentials.new_from_json(creds_json)
     
-    self.service = build('sheets', 'v4', credentials=self.cre)
+    # Delegamos la autenticación al Manager Transversal
+    token_mng = Google_Token_MNG(
+        client_secret=credentials_path, # En modo SA, esto es la ruta al key.json
+        token=None,                     # En modo SA, no necesitamos token de usuario
+        scopes=['https://www.googleapis.com/auth/spreadsheets'], 
+        api_name='sheets', 
+        api_version='v4',
+        use_service_account=use_service_account # El flag que controla todo
+    )
+    
+    self.service = token_mng.get_service()
 
   def get_spreadsheet(self):
-    request = self.service.spreadsheets()
-    return request
+    return self.service.spreadsheets()
 
-  def read_data_dataframe(self,spreadsheetId,range_name):
-    request = self.service.spreadsheets().values().get(spreadsheetId=spreadsheetId, range=range_name)
-    response = request.execute()
-    df_response = pd.DataFrame(response.get('values'))
-    df_response.columns = df_response.iloc[0]
-    df_response.drop(df_response.index[0], inplace = True)
-    return df_response
+  def read_data_dataframe(self, spreadsheetId, range_name):
+    try:
+        request = self.service.spreadsheets().values().get(spreadsheetId=spreadsheetId, range=range_name)
+        response = request.execute()
+        
+        # Validación básica por si la hoja está vacía
+        if 'values' not in response:
+            return pd.DataFrame()
+            
+        df_response = pd.DataFrame(response.get('values'))
+        
+        # Asumimos que la primera fila es el header
+        if not df_response.empty:
+            df_response.columns = df_response.iloc[0]
+            df_response = df_response.drop(df_response.index[0])
+            
+        return df_response
+    except Exception as e:
+        print(f"Error leyendo spreadsheet: {e}")
+        return pd.DataFrame()
 
-  def delete_data(self,sheetid,spreadsheetId,vector,start_index,end_index):
+  def delete_data(self, sheetid, spreadsheetId, vector, start_index, end_index):
     '''
-    Esta funcion permite eliminar data, puede ser una columna, una fila, un rango
-    de celdas o un celda especifica.
-    @sheetid representa el número de serie del spreadsheet
-      *ejemplo:
-        gid = --> 365570799.
-    @vector es lo que representa una columna o una fila, solo puede tomar 2 valores
-    'ROWS' o 'COLUMNS'.
-    @start index indica el indice de inicio
-    @end_indes indica el indice de termino
+    OJO: REVISAR Esta función parece incompleta. Recibes vector, start_index y end_index
+    pero NO los usas en el body_request. Actualmente esto intenta borrar/resetear
+    propiedades de la hoja entera, no un rango específico.
     '''
     body_request ={
       "requests": [
@@ -50,54 +59,33 @@ class Google_Spreadsheet:
             "range": {
               "sheetId": sheetid
             },
-            "fields": "*"
+            "fields": "*" # Esto resetea formato y valores
           }
         }
       ]
     }
-    self.service.spreadsheets().batchUpdate(spreadsheetId=spreadsheetId, body = body_request).execute()
+    self.service.spreadsheets().batchUpdate(spreadsheetId=spreadsheetId, body=body_request).execute()
     print('Data eliminada')
     return True
 
   def update_data(self, spreadsheet_id, range_index, data_list):
-    '''
-    Esta funcion permite insertar data en un rango.
-    @spreadsheet_id representa el valor de la url que se encuentra despues del '/d/' y despues de '/edit#gid=0', este valor
-    debe ser ingresado como string.
-      *ejemplo:
-      https://docs.google.com/spreadsheets/d/1fgzA98yaZmfUTrA0HaTz5PSXJ9ZZ5mSmDH9gLBzqXaw/edit#gid=0
-      spreadsheet_id = '1fgzA98yaZmfUTrA0HaTz5PSXJ9ZZ5mSmDH9gLBzqXaw'
-
-    @range_index indica en que hoja y celda se va a insertar la data.
-      *ejemplo:
-        'Sheet2!A1'
-
-
-    @data_list es la lista(array=[[]]) de data que se va a agregar.
-    '''
     body_request = {'values': data_list}
-    self.service.spreadsheets().values().update(spreadsheetId=spreadsheet_id, range=range_index, valueInputOption='USER_ENTERED', body= body_request).execute()
-    print('Data agregada')
+    self.service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id, 
+        range=range_index, 
+        valueInputOption='USER_ENTERED', 
+        body=body_request
+    ).execute()
+    print('Data actualizada')
     return True
 
   def append_data(self, spreadsheet_id, range_index, data_list):
-    '''
-    Esta funcion permite insertar data en un rango.
-    @spreadsheet_id representa el valor de la url que se encuentra despues del '/d/' y despues de '/edit#gid=0', este valor
-    debe ser ingresado como string.
-      *ejemplo:
-      https://docs.google.com/spreadsheets/d/1fgzA98yaZmfUTrA0HaTz5PSXJ9ZZ5mSmDH9gLBzqXaw/edit#gid=0
-      spreadsheet_id = '1fgzA98yaZmfUTrA0HaTz5PSXJ9ZZ5mSmDH9gLBzqXaw'
-
-    @range_index indica en que hoja y celda se va a insertar la data.
-      *ejemplo:
-        'Sheet2!A1'
-
-
-    @list es la lista(array=[[]]) de data que se va a agregar.
-    '''
-    print(data_list)
     body_request = {'values': data_list}
-    self.service.spreadsheets().values().append(spreadsheetId=spreadsheet_id, range=range_index, valueInputOption='USER_ENTERED', body= body_request).execute()
-    print('Data agregada')
+    self.service.spreadsheets().values().append(
+        spreadsheetId=spreadsheet_id, 
+        range=range_index, 
+        valueInputOption='USER_ENTERED', 
+        body=body_request
+    ).execute()
+    print('Data agregada (Append)')
     return True
