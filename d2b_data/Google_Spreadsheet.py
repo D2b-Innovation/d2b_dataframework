@@ -9,11 +9,26 @@ class Google_Spreadsheet:
     self.credentials_path = credentials_path
     self.url_id  = url_id
     
-    # CORRECCIÓN 1 (Uso): Llamamos directamente a la clase importada
-    # Asumiendo que el archivo se llama Google_Token_MNG.py y la clase también
+    if use_service_account:
+        # Modo ROBOT (Service Account)
+        # El manager usa 'client_secret' como la ruta al key.json
+        arg_secrets = credentials_path
+        arg_token = None # En tu lógica nueva de SA, esto se permite ser None porque entra al if use_sa primero
+    else:
+        # Modo HUMANO (Legacy)
+        # TRUCO: Para evitar que Token_MNG salte al modo Cloud Run (ADC),
+        # debemos pasarle algo en ambos argumentos.
+        
+        # 1. 'token': Es tu archivo credentials_path real (el json con el token).
+        arg_token = credentials_path
+        
+        # 2. 'client_secret': Le pasamos la misma ruta para que no sea None.
+        # ¿Por qué funciona? Porque Token_MNG revisa si 'arg_token' existe como archivo.
+        # Si existe (y existe), IGNORA el client_secret. Así que pasamos el mismo path para cumplir el protocolo.
+        arg_secrets = credentials_path
     self.token_manager = Google_Token_MNG(
-        client_secret=credentials_path, 
-        token=None,                     
+        client_secret=arg_secrets, 
+        token=arg_token,                     
         scopes=['https://www.googleapis.com/auth/spreadsheets'], 
         api_name='sheets', 
         api_version='v4',
