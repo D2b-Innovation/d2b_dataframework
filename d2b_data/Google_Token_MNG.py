@@ -40,16 +40,28 @@ class Google_Token_MNG():
 
 
   def getCredentials(self,secrets, credentials, scopes):
+      if os.environ.get('K_SERVICE'):
+          raise RuntimeError(
+              "¡Error Crítico! El código intentó iniciar un flujo OAuth2 interactivo "
+              "(user-consent) dentro de Cloud Run. Asegúrate de instanciar tu clase "
+              "con `use_service_account=True` y `client_secret=None`."
+          )
+      
       if not os.path.isfile(credentials):
           flow = client.flow_from_clientsecrets(
                   secrets,
                   scope=scopes,
                   redirect_uri='urn:ietf:wg:oauth:2.0:oob')
           auth_uri = flow.step1_get_authorize_url()
-          print("Auth url: {}".format(auth_uri))
-          webbrowser.open(auth_uri)
+          print("Por favor, visita esta URL para autorizar la aplicación:\n{}".format(auth_uri))
+
+          try:
+             webbrowser.open(auth_uri)
+          except Exception as e:
+              print(f"No se pudo abrir el navegador automáticamente: {e}")
+
           time.sleep(3)
-          auth_code = input('Enter the auth code: ')
+          auth_code = input('\nIngresa el código de autorización: ')
           time.sleep(3)
           cre = flow.step2_exchange(auth_code)
           self.saveJson(credentials,cre.to_json())
@@ -65,13 +77,16 @@ class Google_Token_MNG():
       Si use_sa=False: Usa OAuth2 legacy (User-Consent).
       """
       if use_sa:
-        if not secrets or not os.path.exists(secrets):
-             raise ValueError(f"Para Service Account, 'secrets' debe ser la ruta al JSON válido. Ruta recibida: {secrets}")
-          
-        creds = service_account.Credentials.from_service_account_file(
-            secrets,
-            scopes=scopes
-        )
+        if secrets and os.path.exists(secrets):
+            creds = service_account.Credentials.from_service_account_file(
+                secrets,
+                scopes=scopes
+            )
+        else:
+            import google.auth
+            creds, project = google.auth.default(scopes=scopes)
+            print(f"Usando ADC (Cloud Run/Functions). Proyecto detectado: {project}")
+            
         return build(api_name, api_version, credentials=creds, cache_discovery=False)
       
       if None in (secrets, credentials, scopes):
