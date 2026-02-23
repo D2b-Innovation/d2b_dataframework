@@ -40,15 +40,7 @@ class Google_Token_MNG():
           object = json.load(f)
       return object
 
-
-  def getCredentials(self,secrets, credentials, scopes):
-      if os.path.isfile(credentials):
-        import os
-import webbrowser
-import time
-from oauth2client.client import GoogleCredentials # Usar ADC de la misma librería legacy
-
-def getCredentials(self, secrets, credentials, scopes, allow_adc=False):
+  def getCredentials(self, secrets, credentials, scopes, allow_adc=False):
     # 1. PRIORIDAD ABSOLUTA: Si existe el archivo de credenciales, usarlo siempre.
     if os.path.isfile(credentials):
         return client.Credentials.new_from_json(self.openJson(credentials))
@@ -90,7 +82,7 @@ def getCredentials(self, secrets, credentials, scopes, allow_adc=False):
     
     return cre
 
-def create_api(self, api_name, api_version, scopes=None, secrets=None, credentials=None, use_sa=False):
+  def create_api(self, api_name, api_version, scopes=None, secrets=None, credentials=None, use_sa=False):
     """
     Crea el servicio de Google. Dirige el tráfico según el tipo de autenticación.
     """
@@ -116,5 +108,5 @@ def create_api(self, api_name, api_version, scopes=None, secrets=None, credentia
     http_auth = creds.authorize(httplib2.Http())
     return build(api_name, api_version, http=http_auth)
 
-def get_service(self):
+  def get_service(self):
     return self.service
