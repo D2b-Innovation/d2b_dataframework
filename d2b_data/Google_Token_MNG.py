@@ -3,8 +3,10 @@ from google.oauth2 import service_account
 from oauth2client import client
 from builtins import input
 from google_auth_oauthlib import flow
+from oauth2client.client import GoogleCredentials
 
 import httplib2
+import google.auth
 import webbrowser
 import os
 import json
@@ -40,61 +42,79 @@ class Google_Token_MNG():
 
 
   def getCredentials(self,secrets, credentials, scopes):
-      if os.environ.get('K_SERVICE'):
-          raise RuntimeError(
-              "¡Error Crítico! El código intentó iniciar un flujo OAuth2 interactivo "
-              "(user-consent) dentro de Cloud Run. Asegúrate de instanciar tu clase "
-              "con `use_service_account=True` y `client_secret=None`."
-          )
-      
-      if not os.path.isfile(credentials):
-          flow = client.flow_from_clientsecrets(
-                  secrets,
-                  scope=scopes,
-                  redirect_uri='urn:ietf:wg:oauth:2.0:oob')
-          auth_uri = flow.step1_get_authorize_url()
-          print("Por favor, visita esta URL para autorizar la aplicación:\n{}".format(auth_uri))
+      if os.path.isfile(credentials):
+        import os
+import webbrowser
+import time
+from oauth2client.client import GoogleCredentials # Usar ADC de la misma librería legacy
 
-          try:
-             webbrowser.open(auth_uri)
-          except Exception as e:
-              print(f"No se pudo abrir el navegador automáticamente: {e}")
+def getCredentials(self, secrets, credentials, scopes, allow_adc=False):
+    # 1. PRIORIDAD ABSOLUTA: Si existe el archivo de credenciales, usarlo siempre.
+    if os.path.isfile(credentials):
+        return client.Credentials.new_from_json(self.openJson(credentials))
 
-          time.sleep(3)
-          auth_code = input('\nIngresa el código de autorización: ')
-          time.sleep(3)
-          cre = flow.step2_exchange(auth_code)
-          self.saveJson(credentials,cre.to_json())
-      else:
-          cre = client.Credentials.new_from_json(self.openJson(credentials))
-      return cre
+    # 2. Si no hay archivo, validamos si estamos en Cloud Run
+    if os.environ.get('K_SERVICE'):
+        if allow_adc:
+            # Obtiene las ADC usando la misma librería oauth2client para evitar incompatibilidades
+            print("Usando Application Default Credentials (ADC) en Cloud Run...")
+            return GoogleCredentials.get_application_default()
+        else:
+            raise RuntimeError(
+                "¡Error Crítico! No se encontró el archivo de credenciales en Cloud Run y "
+                "allow_adc es False. No se puede iniciar un flujo interactivo en la nube."
+            )
 
+    # 3. Solo si NO estamos en Cloud Run y NO hay archivo, iniciamos el flujo interactivo local
+    flow = client.flow_from_clientsecrets(
+        secrets,
+        scope=scopes,
+        redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+    )
+    auth_uri = flow.step1_get_authorize_url()
+    print("Por favor, visita esta URL para autorizar la aplicación:\n{}".format(auth_uri))
 
-  def create_api(self,api_name, api_version, scopes=None, secrets=None, credentials=None, use_sa=False):
-      """
-      Crea el servicio de Google.
-      Si use_sa=True: Usa Service Account (Server-to-Server).
-      Si use_sa=False: Usa OAuth2 legacy (User-Consent).
-      """
-      if use_sa:
+    try:
+        webbrowser.open(auth_uri)
+    except Exception as e:
+        print(f"No se pudo abrir el navegador automáticamente: {e}")
+
+    time.sleep(3)
+    auth_code = input('\nIngresa el código de autorización: ')
+    time.sleep(3)
+    
+    cre = flow.step2_exchange(auth_code)
+
+    if credentials:
+        self.saveJson(credentials, cre.to_json())
+    
+    return cre
+
+def create_api(self, api_name, api_version, scopes=None, secrets=None, credentials=None, use_sa=False):
+    """
+    Crea el servicio de Google. Dirige el tráfico según el tipo de autenticación.
+    """
+    # FLUJO 1: Cuentas de Servicio (Service Account / ADC) -> Librería Moderna
+    if use_sa:
         if secrets and os.path.exists(secrets):
             creds = service_account.Credentials.from_service_account_file(
                 secrets,
                 scopes=scopes
             )
         else:
-            import google.auth
             creds, project = google.auth.default(scopes=scopes)
             print(f"Usando ADC (Cloud Run/Functions). Proyecto detectado: {project}")
             
         return build(api_name, api_version, credentials=creds, cache_discovery=False)
-      
-      if None in (secrets, credentials, scopes):
-          return build(api_name, api_version)
-      
-           
-      http_auth = self.getCredentials(secrets, credentials, scopes).authorize(httplib2.Http())
-      return build(api_name, api_version, http=http_auth)
+    
+    # FLUJO 2: APIs públicas (sin credenciales y sin scopes específicos)
+    if not use_sa and None in (secrets, credentials, scopes):
+            return build(api_name, api_version)
+    
+    # FLUJO 3: Usuario Final (OAuth2) -> Librería Legacy
+    creds = self.getCredentials(secrets, credentials, scopes)
+    http_auth = creds.authorize(httplib2.Http())
+    return build(api_name, api_version, http=http_auth)
 
-  def get_service(self):
-      return self.service
+def get_service(self):
+    return self.service
