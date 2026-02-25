@@ -2,7 +2,7 @@ import time as sleeptime
 import requests
 import pandas as pd
 from typing import Optional, List, Dict
-from .utc_converter import UTCConverter
+from d2b_data.utc_converter import UTCConverter
 
 class ShopifyAPI:
     """Client to interact with Shopify API"""
