@@ -58,27 +58,48 @@ class Google_Spreadsheet:
         print(f"Error leyendo data: {e}")
         return pd.DataFrame()
 
-  def delete_data(self,sheetid,spreadsheetId,vector,start_index,end_index):
+  def delete_data(self,sheetid,spreadsheetId,vector='ALL', start_index=None, end_index=None, mode="VALUES"):
     '''
-    ADVERTENCIA: Esta función actualmente ignora vector, start_index y end_index.
-    Tal como está, BORRA TODO el contenido de la hoja especificada en sheetid.
+    Borra datos de la hoja.
+    - Si vector='ALL': Borra todo el contenido de la hoja.
+    - Si vector='ROWS': Borra el rango de filas especificado.
+    - Si vector='COLUMNS': Borra el rango de columnas especificado.
+    Ej: 
+    - gs.delete_data(sheetid=0, spreadsheetId='abc123') <- borra todo.
+    - gs.delete_data(sheetid=0, spreadsheetId='abc123', vector='ROWS', start_index=1, end_index=10) <- borra filas 1 a 9.
+    - gs.delete_data(sheetid=0, spreadsheetId='abc123', vector='COLUMNS', start_index=1, end_index=5) <- borra columnas B a D. 
     '''
+    
+    grid_range = {
+       "sheetId": sheetid
+    }
+
+    if vector.upper() =='ROWS':
+      if start_index is not None:grid_range["startRowIndex"] = start_index
+      if end_index is not None:grid_range["endRowIndex"] = end_index
+    elif vector.upper() == 'COLUMNS':
+      if start_index is not None:grid_range["startColumnIndex"] = start_index
+      if end_index is not None:grid_range["endColumnIndex"] = end_index
+    
+    if mode.upper() == "VALUES":
+       target_fields = "userEnteredValue"
+    elif mode.upper() == "FORMAT":
+       target_fields = "userEnteredFormat"
+    else:
+       target_fields = "*"
+
     body_request ={
       "requests": [
         {
           "updateCells": {
-            "range": {
-              "sheetId": sheetid
-              # FALTARIA AQUI DEFINIR startRowIndex, endRowIndex, etc.
-              # Si no se ponen, Google asume toda la hoja.
-            },
-            "fields": "*"
+            "range": grid_range,
+            "fields": target_fields,
           }
         }
       ]
     }
     self.service.spreadsheets().batchUpdate(spreadsheetId=spreadsheetId, body = body_request).execute()
-    print('Data eliminada')
+    print(f'Data eliminada en el rango {start_index}:{end_index} ({vector})')
     return True
 
   def update_data(self, spreadsheet_id, range_index, data_list):
