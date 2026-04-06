@@ -44,7 +44,7 @@ class UTCConverter:
         try:
             # 1. Parseo inicial
             if "T" in date_str:
-                dt = datetime.fromisoformat(date_str)
+                dt = datetime.fromisoformat(date_str).astimezone(timezone.utc)
             else:
                 dt_naive = datetime.strptime(date_str, '%Y-%m-%d')
                 dt = dt_naive.replace(tzinfo=tz)
