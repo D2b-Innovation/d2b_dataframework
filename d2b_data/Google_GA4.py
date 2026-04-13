@@ -126,7 +126,7 @@ class Google_GA4():
         self.debug("Conectado a GA4")
         return self.service
 
-    def _to_DF(self, raw_server_response):
+    def _to_df(self, raw_server_response):
         '''
         Transforma el response de GA4 a DataFrame
         ARGS
@@ -179,12 +179,8 @@ class Google_GA4():
                 return response
             
             except HttpError as e:
-                # Capturamos el error estructurado de Google
                 status_code = e.resp.status
                 reason = e._get_reason()
-                # Lista de errores que merecen reintento:
-                # 429: Too Many Requests (problema actual)
-                # 500, 503: Errores internos de Google (a veces pasan)
                 if status_code in [429, 500, 503]:
                     if retry_count >= max_retries:
                         self.debug(f" Error {status_code} ({reason}): Se agotaron los {max_retries} reintentos.")
@@ -200,8 +196,6 @@ class Google_GA4():
                     raise e
                 
             except Exception as e:
-                # Catch-all por si ocurre un error de conexión socket o algo fuera de HttpError
-                # Si el mensaje contiene 429, aplicamos la misma lógica "sucia" po
                 error_str = str(e)      
                 if "429" in str(e):
                     if retry_count >= max_retries: 
@@ -213,7 +207,7 @@ class Google_GA4():
                     time.sleep(sleep_time)
                     retry_count += 1
                 else:
-                    raise e
+                    raise error_str
 
 
     def get_report_df(self, property_id, query, extract_sampling=None):
@@ -233,7 +227,7 @@ class Google_GA4():
     def _get_single_report(self, property_id, query, extract_sampling=False):
         '''Obtiene un report simple sin paginación'''
         res = self._get_report_raw(property_id, query)
-        df_report = self._to_DF(res)
+        df_report = self._to_df(res)
 
         # Agregar info de sampling si está activada
         if extract_sampling and not df_report.empty:

@@ -2,165 +2,155 @@ import json
 import requests
 import urllib.parse
 import pandas as pd
+from d2b_data.verbose_logger import Verbose
+import time
+import random
 
-class Tiktok():
-  def __init__(self,app_id,secret, token =None, debugEnabled=False):
-    self.endpoint_base = "https://business-api.tiktok.com/open_api/v1.2"
-    self.app_id = app_id
-    self.secret = secret
-    self.token  = token
-    self.redirect  = ""
-    self.auth_code = None
-    self.debugEnabled= debugEnabled
+class TikTokMarketing():
+    def __init__(self, token, verbose=True):
+        self.token = token
+        self.endpoint_base = "https://business-api.tiktok.com/open_api/v1.3/"
 
-  def _debug(self,msg):
-    if self.debugEnabled:
-      print(msg)
+        self.verbose = Verbose(
+            active=verbose,
+            alerts_enabled=False,
+            workflow_name="TikTokMarketing"
+        )
 
-  def get_authorization_url(self,redirect_uri=None):
-    '''
-    '''
-    if redirect_uri is None:
-      raise Exception("redirect uri is required")
+        self.headers = {
+            "Access-Token": self.token,
+            "Content-Type": "application/json"
+        }
 
-    #if redirect_uri is None and self.redirect_uri is None:
-    #  raise Exception("redirect uri is required")
-
-
-
-    #  redirect_uri = self.redirect_uri
-    redirect_uri = urllib.parse.quote_plus(redirect_uri)
-    authorization_url = f"https://business-api.tiktok.com/portal/auth?app_id={self.app_id}&state=your_custom_params&redirect_uri={redirect_uri}"
-    return authorization_url
-
-  def set_auth_code(self,auth_code):
-    '''
-    '''
-
-    self.auth_code = auth_code
-    return self.auth_code
-
-  def set_token(self,token):
-    '''
-    '''
-
-    self.token = token
-    return self.token
-
-  def get_token(self,code):
-    '''
-    '''
-    self._debug(f"get_token : Start with {code}")
-    endpoint_url = f"{self.endpoint_base}/oauth2/access_token/"
-    params = {
-      "auth_code" : code,
-      "secret"    : self.secret,
-      "app_id"    : self.app_id
-    }
-
-    headers = {'Content-Type': 'application/json'}
-    self._debug(f"""get_token | start request | {endpoint_url} + {params}""")
-
-    response = requests.post(url=endpoint_url, params=params ,headers= headers)
-
-    if json.loads(response.content).get("code") == 40002:
-      msg =  json.loads(response.content)
-      raise Exception(f"""Unable to get Token, response:
-      {msg} """)
-    response_json = json.loads(response.content)
-    self._debug(f"""get_token | end request  | response {response_json}""")
-    token =  response_json.get("data",{}).get("access_token")
-    self.token = token
-    self._debug(f"""get_token | END | {self.token}""")
-
-    return self.token
-
-  def auth_flow(self,redirect_uri=None,force_reset = False,token_filename="tiktok.token"):
-    '''
-    '''
-    self._debug(f"auth_flow | start")
-
-    if force_reset is False:
-      if self.token is not None:
-        print("Token is provided")
-        return True
-
-      if redirect_uri is None:
-        redirect_uri = self.redirect
-
-    print("Access to the following adreess and get the code:")
-    print(self.get_authorization_url(redirect_uri))
-    code = input("insert code: ")
-
-
-    token = self.get_token(code)
-    self._export_token(token_filename,token)
-    self._debug(f"auth_flow: END with token = {token}")
-    return token
-
-  def get_report(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="false",data_level = "AUCTION_AD",start_date=False , end_date=False):
-    '''
-    '''
-    report_base_URL= f'https://business-api.tiktok.com/open_api/v1.2/reports/integrated/get/'
-    query = {
-      "advertiser_id"    : f'{advertiser_id}',
-      "report_type"      : report_type,
-      "lifetime"         : lifetime,
-      "data_level"       : data_level,
-      "dimensions"       : dimensions,
-      "metrics"          : metrics,
-      "page_size" : 999
-      }
-
-    if start_date != False:
-      query["start_date"] = start_date
-
-    if end_date != False:
-      query["end_date"] = end_date
-
-
-
-
-    headers = {'Content-Type': 'application/json',
-           'Access-Token' : self.token}
-
-    report_requests = requests.get( url =report_base_URL  ,headers=headers, params=query)
-    json_report_requests = json.loads(report_requests.content)
-    self._debug(json_report_requests)
-
-    if json_report_requests.get("code")  == 40002:
-      print("No Results")
-      raise Exception("an error occurred", "No data in request, if you want to skip this add skip=True", 42)
-    return json_report_requests
-
-  def get_report_dataframe(self,advertiser_id, dimensions, metrics, report_type="BASIC",lifetime="false",data_level = "AUCTION_AD", start_date=False, end_date=False):
-    '''
-    '''
-
-    date_range = pd.date_range(start_date, end_date)
-    query_array = []
-
-    for date_iter in date_range:
-      date_iter_str = date_iter.strftime("%Y-%m-%d")
-      report_requests = self.get_report(advertiser_id, dimensions, metrics, report_type,lifetime,data_level, start_date=date_iter_str, end_date=date_iter_str)
-      report_data = report_requests.get("data",None).get("list",None)
-
-      df_iter = pd.json_normalize(report_data)
-      query_array.append(df_iter)
-
-    DF = pd.concat(query_array)
+        self.verbose.log("Tiktok Class instanciated with token")
     
-    return  DF
+    def get_access_token(self, app_id, secret, auth_code):
+        """Intercambia el auth_code por un access_token"""
+        url = f"{self.endpoint_base}oauth2/access_token/"
+        payload = {
+            "app_id": app_id,
+            "secret": secret,
+            "auth_code": auth_code
+        }
+        response = requests.post(url, json=payload)
+        data = response.json()
+        
+        if data.get("code") == 0:
+            self.token = data['data']['access_token']
+            self.headers["Access-Token"] = self.token
+            self.verbose.log(" Token obtenido y actualizado en la clase.")
+            return data['data']
+        else:
+            self.verbose.log(f" Error obteniendo token: {data.get('message')}")
+            return None
+    
+    def get_authorized_advertisers(self, app_id, secret):
+        """Returns a list with the advertisers that the token has access to"""
+        url=f"{self.endpoint_base}oauth2/advertiser/get/"
+
+        params = {
+            "app_id": app_id,
+            "secret": secret
+        }
+
+        if not app_id or not secret:
+            self.verbose.log(" You must provide add_id or secret to retrieve accounts")
+            return []
+        
+        response = requests.get(url, headers=self.headers, params=params)
+        data = response.json()
+        if data.get("code") == 0:
+            return data.get('data', {}).get('list', [])
+        return []
+
+    def _get_report_raw(self, params, max_retries=5):
+        """Low level calling API method"""
+
+        url = f"{self.endpoint_base}report/integrated/get/"
+
+        self.verbose.log(f" Calling the TikTok API v1.3 for dates:{params.get('start_date')} -> {params.get('end_date')}")
+        
+
+        for attempt in range(max_retries):
+            try:
+              self.verbose.log(f" Calling TikTok API: {params.get('start_date')} -> {params.get('end_date')} (Intento {attempt+1})")
+              response = requests.get(url, headers=self.headers, params=params)
+
+              if response.status_code == 429:
+                  wait_time = (2 ** attempt) + random.random()
+                  self.verbose.log(f"Rate limit exceeded. Waiting for {wait_time} seconds before retrying.")
+                  time.sleep(wait_time)
+                  continue
+
+              response.raise_for_status()
+              data = response.json()
+
+              if data.get("code") != 0:
+                self.verbose.log(f"Error en API de TikTok: {data.get('message')} (Code: {data.get('code')})")
+                return None
+
+              return data
+
+            except requests.exceptions.HTTPError as e:
+                  self.verbose.log(f"HTTP Error: {e}")
+                  return None
+            except Exception as e:
+              self.verbose.log(f"Error calling the API: {e}")
+              return None
 
 
-  def _export_token(self,filename, token=None):
-      if token is None:
-        token= self.token
-      with open(filename, 'w') as f:
-          f.write(token)
+    def get_report_dataframe(self, advertiser_id: str, start_date: str, end_date: str, dimensions: list, metrics: list, data_level="AUCTION_AD"):
+      """Constructs the params for _get_report_raw and transforms to Pandas DataFrame"""
 
-  def _import_token(self,filename):
-      f = open(filename, "r")
-      object = f.read()
-      retun_string = self.set_token(object)
-      return retun_string
+      start_dt = pd.to_datetime(start_date)
+      end_dt = pd.to_datetime(end_date)
+
+      current_start = start_dt
+      all_dataframes = []
+
+      while current_start <= end_dt:
+            current_end = min(current_start + pd.Timedelta(days=29), end_dt)
+            self.verbose.log(f" Extracting data from date: {current_start} to date: {current_end}")
+
+            page = 1
+            while True:
+                  params = {
+                      "advertiser_id": advertiser_id,
+                      "service_type": "AUCTION",
+                      "report_type": "BASIC",
+                      "data_level": data_level,
+                      "start_date": current_start.strftime('%Y-%m-%d'),
+                      "end_date": current_end.strftime('%Y-%m-%d'),
+                      "metrics": json.dumps(metrics),
+                      "dimensions": json.dumps(dimensions),
+                      "page_size": 1000,
+                      "page": page
+                      }
+
+                  data = self._get_report_raw(params)
+
+                  if data is None:
+                     return pd.DataFrame()
+
+                  if data and "list" in data.get("data", {}):
+                     all_dataframes.extend(data["data"]["list"])
+
+                  total_page = data.get("data", {}).get("page_info", {}).get("total_page", 1)
+                  if page < total_page:
+                      page += 1
+                  else:
+                      break
+
+            current_start = current_end + pd.Timedelta(days=1)
+
+      if all_dataframes:
+          result_df = pd.json_normalize(all_dataframes)
+          result_df.columns = [col.split('.')[-1] for col in result_df.columns]
+          for col in metrics:
+              result_df[col] = pd.to_numeric(result_df[col], errors="coerce")
+          self.verbose.log(f"Total rows extracted {len(result_df)}")
+          return result_df
+      else:
+          self.verbose.log("No data was extracted")
+          return pd.DataFrame()
+
