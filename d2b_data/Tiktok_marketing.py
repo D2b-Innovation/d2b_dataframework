@@ -7,7 +7,7 @@ import time
 import random
 
 class TikTokMarketing():
-    def __init__(self, token, verbose=True):
+    def __init__(self, token: str | None, verbose: bool = True):
         self.token = token
         self.endpoint_base = "https://business-api.tiktok.com/open_api/v1.3/"
 
@@ -24,7 +24,7 @@ class TikTokMarketing():
 
         self.verbose.log("Tiktok Class instanciated with token")
     
-    def get_access_token(self, app_id, secret, auth_code):
+    def get_access_token(self, app_id: str, secret: str, auth_code: str):
         """Intercambia el auth_code por un access_token"""
         url = f"{self.endpoint_base}oauth2/access_token/"
         payload = {
@@ -44,7 +44,7 @@ class TikTokMarketing():
             self.verbose.log(f" Error obteniendo token: {data.get('message')}")
             return None
     
-    def get_authorized_advertisers(self, app_id, secret):
+    def get_authorized_advertisers(self, app_id: str, secret: str):
         """Returns a list with the advertisers that the token has access to"""
         url=f"{self.endpoint_base}oauth2/advertiser/get/"
 
@@ -63,7 +63,7 @@ class TikTokMarketing():
             return data.get('data', {}).get('list', [])
         return []
 
-    def _get_report_raw(self, params, max_retries=5):
+    def _get_report_raw(self, params: dict, max_retries: int = 5):
         """Low level calling API method"""
 
         url = f"{self.endpoint_base}report/integrated/get/"
@@ -99,7 +99,7 @@ class TikTokMarketing():
               return None
 
 
-    def get_report_dataframe(self, advertiser_id: str, start_date: str, end_date: str, dimensions: list, metrics: list, data_level="AUCTION_AD"):
+    def get_report_dataframe(self, advertiser_id: str, start_date: str, end_date: str, dimensions: list, metrics: list, data_level: str = "AUCTION_AD"):
       """Constructs the params for _get_report_raw and transforms to Pandas DataFrame"""
 
       start_dt = pd.to_datetime(start_date)
