@@ -1,5 +1,7 @@
 from d2b_data.Google_GA4 import Google_GA4
 from unittest.mock import MagicMock
+from googleapiclient.errors import HttpError
+import pytest
 
 def test_instance_is_created_correctly(ga4):
     """Verifies that the object is created correctly"""
@@ -108,3 +110,28 @@ def test_get_report_raw_no_errors(ga4):
 
     result = ga4._get_report_raw("properties/123", {"requests": [{}]})
     assert result == raw_response
+
+def test_get_report_429_backoff(ga4, mocker):
+    """Testing for the 429 error handling and exponential backoff"""
+    
+    fake_resp = MagicMock()
+    fake_resp.status = 429
+    http_error = HttpError(resp=fake_resp, content=b"Too Many Requests")
+    mock_execute = MagicMock(side_effect=http_error)
+    mock_batch = MagicMock(execute=mock_execute)
+    mock_properties = MagicMock(
+        return_value=MagicMock(
+            batchRunReports=MagicMock(return_value=mock_batch)
+        )
+    )
+    ga4.service.properties = mock_properties
+
+    mock_sleep = mocker.patch("time.sleep")
+
+    with pytest.raises(HttpError):
+        ga4._get_report_raw("properties/123", {"requests": [{}]})
+
+    assert mock_sleep.call_count == 5
+
+
+
