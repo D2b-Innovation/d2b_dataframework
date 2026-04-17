@@ -20,16 +20,15 @@ class TikTokMarketing():
         self.verbose = Verbose(
             active=verbose,
             alerts_enabled=False,
-            workflow_name="TikTokMarketing"
+            workflow_name="TikTokMarketing class"
         )
 
         if os.path.isfile(self.token_path):
             self._load_token_from_file()
             if self.token:
-                # Testing connection (currently returns True via pass/None logic)
                 if self._token_test_connection():
                     self.headers["Access-Token"] = self.token
-                    self.verbose.log(f"TikTok Class instantiated with token from {self.token_path}")
+                    self.verbose.log(f"TikTok Class instantiated with token from {self.token_path}, ready to retrieve data.")
                 else:
                     self.verbose.log("Invalid token. New token must be generated")
                     self.token = None
@@ -43,17 +42,38 @@ class TikTokMarketing():
                 token_data = json.load(file)
                 
             self.app_id = token_data.get("app_id")
-            self.secret = token_data.get("secret") # Fixed: was getting app_id
+            self.secret = token_data.get("secret")
             self.token = token_data.get("access_token")
             return token_data
         except Exception as e:
             self.verbose.log(f"Error loading token from file: {e}")
             return None
 
-    def _token_test_connection(self):
-        """Placeholder for connection testing logic"""
-        # For now, we return True to allow the __init__ to proceed
-        return True
+    def _token_test_connection(self) -> bool:
+        """
+        Validates the token against the API.
+        """
+        url = f"{self.endpoint_base}oauth2/advertiser/get/"
+        if not self.app_id or not self.secret or not self.token:
+            return False
+        
+        params = {
+            "app_id": self.app_id,
+            "secret": self.secret
+        }
+
+        test_headers = {
+            "Access-Token": self.token,
+            "Content-Type": "application/json", 
+        }
+
+        try:
+            connection_test_response = requests.get(url, headers=test_headers, params=params)
+            connection_test_response_json = connection_test_response.json()
+            return connection_test_response_json.get("code") == 0
+        except Exception as e:
+            self.verbose.log(f"Error during connection test: {e}")
+            return False
 
     def get_access_token(self, app_id: str, secret: str, auth_code: str):
         """Exchanges auth_code for access_token and saves to JSON"""
@@ -97,7 +117,7 @@ class TikTokMarketing():
             return None
 
     def get_authorized_advertisers(self, app_id: str | None = None, secret: str | None = None):
-        """Returns a list of advertisers accessible by the current token"""
+        """Public method that returns a list of advertisers accessible by the current token"""
         url = f"{self.endpoint_base}oauth2/advertiser/get/"
 
         # Update credentials if provided
