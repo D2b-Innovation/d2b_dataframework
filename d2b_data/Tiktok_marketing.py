@@ -2,11 +2,12 @@ import json
 import requests
 import urllib.parse
 import pandas as pd
-from d2b_data.verbose_logger import Verbose
 import time
 import random
 import os
 import webbrowser
+
+from d2b_data.verbose_logger import Verbose
 
 class TikTokMarketing():
     def __init__(self, token_path: str | None = None, verbose: bool = True):
