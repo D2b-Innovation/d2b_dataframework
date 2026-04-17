@@ -115,6 +115,7 @@ class TikTokMarketing():
         else:
             self.verbose.log(f"Error obtaining token: {res_json.get('message')}")
             return None
+    # Se debe implementar el input en el auth code
 
     def get_authorized_advertisers(self, app_id: str | None = None, secret: str | None = None):
         """Public method that returns a list of advertisers accessible by the current token"""
