@@ -6,7 +6,7 @@ import time
 import random
 import os
 import webbrowser
-
+# test de commit fuera
 from d2b_data.verbose_logger import Verbose
 
 class TikTokMarketing():
