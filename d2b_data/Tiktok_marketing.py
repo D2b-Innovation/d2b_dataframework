@@ -14,7 +14,7 @@ class TikTokMarketing():
         self.endpoint_base = "https://business-api.tiktok.com/open_api/v1.3/"
         self.token_path = token_path if token_path else "token_tiktok.json"
         self.token = None
-        self.app_id = None #from the app
+        self.app_id = None
         self.secret = None
         self.headers = {"Content-Type": "application/json"}
 

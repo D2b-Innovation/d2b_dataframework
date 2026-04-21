@@ -133,5 +133,27 @@ def test_get_report_429_backoff(ga4, mocker):
 
     assert mock_sleep.call_count == 5
 
+def test_get_single_report_no_sampling_returns_no_sampling_cols(ga4, df_fake):
+    """Tesing that the class handles sampling data, no sampling data and an empty response with sampling data"""
+    
+    ga4._get_report_raw = MagicMock(return_value={"anything": True}) 
+    ga4._to_df = MagicMock(return_value=df_fake)
 
+    result = ga4._get_single_report("properties/123", {})
 
+    sampling_cols = ['samplesReadCounts', 'samplingSpaceSizes', 'sampling_percentage',
+                   'sampled', 'dataLossFromOtherRow']
+    
+    assert not any(col in result.columns for col in sampling_cols)
+
+def test_get_single_report_with_sampling_returns_data_and_sampling_cols(ga4, raw_response_with_sampling, df_fake_with_sampling):
+    """Testing thath the report comes with sampling data"""
+    ga4._get_report_raw = MagicMock(return_value=raw_response_with_sampling)  
+    ga4._to_df = MagicMock(return_value=df_fake_with_sampling)
+
+    result = ga4._get_single_report("properties/123", {})
+
+    sampling_cols = ['samplesReadCounts', 'samplingSpaceSizes', 'sampling_percentage',
+                   'sampled', 'dataLossFromOtherRow']
+    
+    assert all(col in result.columns for col in sampling_cols)

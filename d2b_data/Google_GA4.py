@@ -7,6 +7,7 @@ import random
 import time
 import datetime
 import d2b_data.Google_Token_MNG 
+import copy
 
 from datetime import timedelta, datetime
 from googleapiclient.discovery import build
@@ -15,13 +16,12 @@ from google.oauth2 import service_account
 from oauth2client import client
 from builtins import input
 from google_auth_oauthlib import flow
-import copy
 
 
 
 
 class Google_GA4():
-    def __init__(self, client_secret, token_json, debug=False, auto_paginate=True, extract_sampling=False, intraday_limit=30, use_service_account=False):
+    def __init__(self, client_secret: str, token_json: str, debug: bool = False, auto_paginate: bool = True, extract_sampling: bool = False, intraday_limit: int = 30, use_service_account: bool = False):
         self.default_api_name = 'analyticsdata'
         self.default_version = 'v1beta'
         self.client_secret = client_secret
@@ -31,13 +31,9 @@ class Google_GA4():
         self.intraday_limit = intraday_limit * 100000
         self.service = self.create_service(self.client_secret, token_json, use_service_account)
 
-    def _extract_sampling_info(self, report_data):
+    def _extract_sampling_info(self, report_data: dict) -> dict:
         '''
-        Extrae información de sampling del response de GA4
-        ARGS
-        report_data <dict> Datos del report
-        RETURN
-        <dict> Diccionario con info de sampling
+        Extracts sampling information from the GA4 report metadata.
         '''
         info = {
             'samplesReadCounts': 0,
@@ -69,50 +65,36 @@ class Google_GA4():
         return info
 
     def get_service(self):
-        '''return the service object'''
+        """return the service object"""
         return self.service
 
     def get_token(self):
-        '''return the token'''
+        """return the token"""
         return self.token
 
     def get_credentials(self):
-        '''return credentials'''
+        """return credentials"""
         return self.credentials
 
-    def set_auto_paginate(self, auto_paginate=True):
-        '''
-        Activa/desactiva la paginación automática
-        ARGS
-        auto_paginate <bool> True para paginación automática
-        RETURNS
-        <bool> Estado actual
-        '''
+    def set_auto_paginate(self, auto_paginate: bool = True):
+        """
+        Activates/deactivates automatic pagination for large reports
+        """
         if type(auto_paginate) == bool:
             self.auto_paginate = auto_paginate
         return self.auto_paginate
 
-    def set_extract_sampling(self, extract_sampling=True):
-        '''
-        Activa/desactiva extracción de info de sampling
-        ARGS
-        extract_sampling <bool> True para extraer sampling info
-        RETURNS
-        <bool> Estado actual
-        '''
+    def set_extract_sampling(self, extract_sampling: bool = True):
+        """
+        Activates/deactivates extraction of sampling info into the DataFrame
+        """
         if type(extract_sampling) == bool:
             self.extract_sampling = extract_sampling
         return self.extract_sampling
 
-    def create_service(self, secrets, credentials, use_service_account=False):
-        """Crea conexión con GA4 soportando Service Account y Legacy
-        ARGS
-        secrets <str> Path al client_secret.json
-        credentials <str> Path al token.json o Service Account JSON
-        use_service_account <bool> Si True, usa Service Account
-        RETURNS
-        <googleapiclient.discovery.Resource> Objeto service de GA4
-        """
+    def create_service(self, secrets: str, credentials: str, use_service_account: bool = False):
+        """Creates the Google Analytics Data API service object using the provided credentials."""
+
         token_mng = d2b_data.Google_Token_MNG.Google_Token_MNG(
             client_secret=secrets,  # Si es SA, esto es la ruta al JSON key
             token=credentials,      # Si es SA, esto puede ser None
@@ -126,14 +108,10 @@ class Google_GA4():
         self.debug("Conectado a GA4")
         return self.service
 
-    def _to_df(self, raw_server_response):
-        '''
-        Transforma el response de GA4 a DataFrame
-        ARGS
-        raw_server_response <dict> Response del API
-        RETURN
-        <DataFrame> Datos en formato pandas
-        '''
+    def _to_df(self, raw_server_response: dict) -> pd.DataFrame:
+        """
+        Transforms the raw GA4 API response into a Pandas DataFrame.
+        """
         if not raw_server_response.get("reports"):
             return pd.DataFrame()
 
@@ -156,22 +134,20 @@ class Google_GA4():
         
         return pd.DataFrame(results, columns=cols)
 
-    def debug(self, message):
-        '''Imprime mensaje si debug está activado'''
+    def debug(self, message: str):
+        """Prints debug messages if debug mode is enabled."""
         if self.debug_status:
             print(message)
 
-    def _get_report_raw(self, property_id, query):
-        '''
-        Ejecuta query raw contra GA4 API con Exponential Backoff + Jitter
-        Maneja errores 429 (Quota) y 5xx (Server Errors)
-        '''
+    def _get_report_raw(self, property_id: str, query: dict):
+        """
+        Executes the API call to retrieve the raw report data, with retry logic for handling rate limits and transient errors.
+        """
         max_retries = 5
         retry_count = 0
 
         while True:
             try:
-                # Intentamos ejecutar la llamada a la API (método antiguo)
                 response = self.service.properties().batchRunReports(
                     property=property_id, 
                     body=query
@@ -183,16 +159,16 @@ class Google_GA4():
                 reason = e._get_reason()
                 if status_code in [429, 500, 503]:
                     if retry_count >= max_retries:
-                        self.debug(f" Error {status_code} ({reason}): Se agotaron los {max_retries} reintentos.")
+                        self.debug(f" Error {status_code} ({reason}): max retries {max_retries} exceeded.")
                         raise e 
 
                     sleep_time = (2 ** retry_count) + random.uniform(0, 1)
 
-                    self.debug(f" Error {status_code}. Reintento {retry_count + 1}/{max_retries}. Esperando {sleep_time:.2f}s...")
+                    self.debug(f" Error {status_code}. Retry {retry_count + 1}/{max_retries}. Waiting {sleep_time:.2f}s...")
                     time.sleep(sleep_time)
                     retry_count += 1
                 else:
-                    self.debug(f" Error no recuperable {status_code}: {reason}")
+                    self.debug(f" Not recoverable {status_code}: {reason}")
                     raise e
                 
             except Exception as e:
@@ -202,7 +178,7 @@ class Google_GA4():
                         raise e
                     
                     sleep_time = (2 ** retry_count) + random.uniform(0, 1)
-                    self.debug(f" Error genérico detectad (posible 429). Esperando {sleep_time:.2f} s...")
+                    self.debug(f" Generic error detected (possible 429). Waiting {sleep_time:.2f} s...")
                     
                     time.sleep(sleep_time)
                     retry_count += 1
@@ -210,13 +186,9 @@ class Google_GA4():
                     raise error_str
 
 
-    def get_report_df(self, property_id, query, extract_sampling=None):
-        '''
-        ARGS
-        extract_sampling <bool>: Si None, usa self.extract_sampling. 
-                                Si True/False, sobrescribe para esta llamada.
-        '''
-        # Determinar si extraer sampling
+    def get_report_df(self, property_id: str, query: dict, extract_sampling=None) -> pd.DataFrame:
+        """Public method to retrieve a report as a DataFrame, with optional automatic pagination and sampling info extraction."""
+        
         should_extract = extract_sampling if extract_sampling is not None else self.extract_sampling
         
         if not self.auto_paginate:
@@ -224,8 +196,8 @@ class Google_GA4():
         
         return self._get_paginated_report(property_id, query, should_extract)
 
-    def _get_single_report(self, property_id, query, extract_sampling=False):
-        '''Obtiene un report simple sin paginación'''
+    def _get_single_report(self, property_id: str, query: dict, extract_sampling: bool=False):
+        """Obtains a single report without pagination, with optional sampling info extraction."""
         res = self._get_report_raw(property_id, query)
         df_report = self._to_df(res)
 
@@ -241,16 +213,16 @@ class Google_GA4():
 
         return df_report
 
-    def _get_paginated_report(self, property_id, query, extract_sampling=False):
-        '''
-        Obtiene report con paginación automática por días y offset
-        '''
+    def _get_paginated_report(self, property_id: str, query: dict, extract_sampling: bool=False):
+        """
+        Obtains a report with automatic pagination, iterating day by day to avoid sampling and API limits.
+        """
         # Extraer rango de fechas
         original_date_ranges = query['requests'][0]['dateRanges']
         start_date = original_date_ranges[0]['startDate']
         end_date = original_date_ranges[0]['endDate']
 
-        self.debug(f"Paginando desde {start_date} hasta {end_date}")
+        self.debug(f"Paging from {start_date} to {end_date}")
 
         # Convertir a datetime
         start = datetime.strptime(start_date, "%Y-%m-%d")
@@ -263,7 +235,7 @@ class Google_GA4():
         # Iterar día por día
         while current_date <= end:
             day_str = current_date.strftime('%Y-%m-%d')
-            self.debug(f"Consultando día: {day_str}")
+            self.debug(f"Consulting day: {day_str}")
 
             # Obtener todas las filas del día
             day_dataframes = self._get_all_rows_for_day(property_id, query, day_str, extract_sampling)
@@ -276,16 +248,16 @@ class Google_GA4():
         # Combinar resultados
         if all_dataframes:
             result_df = pd.concat(all_dataframes, ignore_index=True)
-            self.debug(f"Total de filas obtenidas: {len(result_df)}")
+            self.debug(f"Total of rows obtained: {len(result_df)}")
             return result_df
         else:
-            self.debug("No se encontraron datos")
+            self.debug("No data found for the specified period.")
             return pd.DataFrame()
 
-    def _get_all_rows_for_day(self, property_id, query, day_str, extract_sampling=False):
-        '''
-        Obtiene todas las filas de un día usando offset
-        '''
+    def _get_all_rows_for_day(self, property_id: str, query: dict, day_str: str, extract_sampling: bool=False):
+        """
+        Obtains all rows for a specific day using offset
+        """
         day_dataframes = []
         offset = 0
         limit_per_request = 250000
@@ -314,14 +286,14 @@ class Google_GA4():
 
         total_rows = sum(len(df) for df in day_dataframes)
         if total_rows > 0:
-            self.debug(f"  ✓ Total del día: {total_rows} filas")
+            self.debug(f" Total rows for the day: {total_rows}")
 
         return day_dataframes
 
-    def _create_daily_query(self, original_query, start_date, end_date):
-        '''
-        Crea copia de query con fechas específicas
-        '''
+    def _create_daily_query(self, original_query: dict, start_date: str, end_date: str) -> dict:
+        """
+        Creates a copy of the query with specific dates
+        """
         daily_query = copy.deepcopy(original_query)
         daily_query['requests'][0]['dateRanges'] = [{
             'startDate': start_date,

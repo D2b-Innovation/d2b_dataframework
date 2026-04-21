@@ -19,3 +19,45 @@ def ga4(mocker):
         token_json="fake_token.json",
         debug=False
     )
+
+@pytest.fixture
+def df_fake():
+    import pandas as pd
+    return pd.DataFrame({
+        "date": ["2024-01-01"],
+        "city": ["Santiago"],
+        "sessions": ["150"]
+    })
+
+@pytest.fixture
+def raw_response_with_sampling():
+    return {
+        "reports": [{
+            "dimensionHeaders": [{"name": "date"}],
+            "metricHeaders": [{"name": "sessions"}],
+            "rows": [
+                {
+                    "dimensionValues": [{"value": "2024-01-01"}],
+                    "metricValues": [{"value": "150"}]
+                }
+            ],
+            "metadata": {
+                "samplingMetadatas": [
+                    {"samplesReadCounts": "500", "samplingSpaceSizes": "1000"}
+                ]
+            }
+        }]
+    }
+
+@pytest.fixture
+def df_fake_with_sampling():
+    import pandas as pd
+    return pd.DataFrame({
+        "date": ["2024-01-01"],
+        "sessions": ["150"],
+        "samplesReadCounts": [500],
+        "samplingSpaceSizes": [1000],
+        "sampling_percentage": [50.0],
+        "sampled": [True],
+        "dataLossFromOtherRow": [False]
+    })
