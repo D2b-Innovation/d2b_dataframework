@@ -112,10 +112,10 @@ class TikTokMarketing():
             except Exception as e:
                 self.verbose.log(f"Error saving token to file: {e}")
 
-            return token_data
+            return 200
         else:
             self.verbose.log(f"Error obtaining token: {res_json.get('message')}")
-            return None
+            return True
     # Se debe implementar el input en el auth code
 
     def get_authorized_advertisers(self, app_id: str | None = None, secret: str | None = None):
