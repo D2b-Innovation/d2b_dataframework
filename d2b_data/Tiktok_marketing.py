@@ -41,7 +41,10 @@ class TikTokMarketing():
         try:
             with open(self.token_path, 'r') as file:
                 token_data = json.load(file)
-                
+
+            if not all(k in token_data for k in ("app_id", "secret", "access_token")):
+                self.verbose.log("Token file is missing required fields (app_id, secret, access_token)")
+                return None    
             self.app_id = token_data.get("app_id")
             self.secret = token_data.get("secret")
             self.token = token_data.get("access_token")
