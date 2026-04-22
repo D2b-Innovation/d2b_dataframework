@@ -277,9 +277,6 @@ class TikTokMarketing():
         if all_records:
             df = pd.json_normalize(all_records)
             df.columns = [col.split('.')[-1] for col in df.columns]
-            for col in metrics:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce")
             self.verbose.log(f"Successfully extracted {len(df)} rows")
             return df
         
