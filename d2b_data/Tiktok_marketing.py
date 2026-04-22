@@ -2,6 +2,7 @@ import json
 import requests
 import urllib.parse
 import pandas as pd
+import copy
 import time
 import random
 import os
@@ -174,8 +175,63 @@ class TikTokMarketing():
         return None
 
     def get_report_json(self, params: dict, max_retries: int = 5):
-        """Public method to retrieve raw JSON data for debugging"""
-        return self._get_report_raw(params, max_retries)
+        """Public method to retrieve raw JSON data with date chunking and pagination for debugging"""
+        
+        # Si no hay fechas en los parámetros, hacemos la llamada directa sin iterar
+        if "start_date" not in params or "end_date" not in params:
+            self.verbose.log("No start_date or end_date found in params. Making a direct request. IT MUST NOT EXCEED 30 DAYS PERIOD")
+            return self._get_report_raw(params, max_retries)
+
+        start_dt = pd.to_datetime(params["start_date"])
+        end_dt = pd.to_datetime(params["end_date"])
+        current_start = start_dt
+        all_records = []
+
+        # Usamos una copia para no mutar el diccionario original que pasa el usuario
+        request_params = copy.deepcopy(params)
+
+        while current_start <= end_dt:
+            # Límite de 30 días por petición (current_start + 29 días)
+            current_end = min(current_start + pd.Timedelta(days=29), end_dt)
+            self.verbose.log(f"Extracting JSON {current_start.date()} to {current_end.date()}")
+
+            request_params["start_date"] = current_start.strftime('%Y-%m-%d')
+            request_params["end_date"] = current_end.strftime('%Y-%m-%d')
+            
+            page = 1
+            while True:
+                request_params["page"] = page
+                
+                # Pasamos tanto los parámetros actualizados como max_retries
+                data = self._get_report_raw(request_params, max_retries)
+
+                if not data or "list" not in data.get("data", {}):
+                    break
+
+                # Acumulamos los registros de esta página/bloque de fechas
+                all_records.extend(data["data"]["list"])
+
+                total_page = data.get("data", {}).get("page_info", {}).get("total_page", 1)
+                if page < total_page:
+                    page += 1
+                else:
+                    break
+
+            # Avanzamos al siguiente bloque de fechas
+            current_start = current_end + pd.Timedelta(days=1)
+
+        if not all_records:
+            self.verbose.log("No raw JSON data found for the specified period")
+            return {}
+
+        self.verbose.log(f"Successfully extracted {len(all_records)} total raw records")
+        
+        # Reconstruimos la estructura JSON original consolidando todos los registros
+        return {
+            "data": {
+                "list": all_records
+            }
+        }
 
     def get_report_dataframe(self, advertiser_id: str, start_date: str, end_date: str, dimensions: list, metrics: list, data_level: str = "AUCTION_AD"):
         """Extracts data and converts it into a formatted Pandas DataFrame"""
@@ -229,3 +285,28 @@ class TikTokMarketing():
         
         self.verbose.log("No data found for the specified period")
         return pd.DataFrame()
+
+
+#   def auth_flow(self,redirect_uri=None,force_reset = False,token_filename="tiktok.token"):
+#     '''
+#     '''
+#     self._debug(f"auth_flow | start")
+
+#     if force_reset is False:
+#       if self.token is not None:
+#         print("Token is provided")
+#         return True
+
+#       if redirect_uri is None:
+#         redirect_uri = self.redirect
+
+#     print("Access to the following adreess and get the code:")
+#     print(self.get_authorization_url(redirect_uri))
+#     code = input("insert code: ")
+
+
+#     token = self.get_token(code)
+#     self._export_token(token_filename,token)
+#     self._debug(f"auth_flow: END with token = {token}")
+#     return token
+
