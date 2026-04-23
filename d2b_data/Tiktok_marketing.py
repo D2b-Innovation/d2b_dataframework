@@ -202,6 +202,19 @@ class TikTokMarketing():
         # Evitar json.dumps en cada iteración, se asume que el usuario pasa los parámetros correctamente formateados.        
         # Si no hay fechas en los parámetros, hacemos la llamada directa sin iterar
 
+        # params = {
+        #             "advertiser_id": advertiser_id,
+        #             "service_type": "AUCTION",
+        #             "report_type": "BASIC",
+        #             "data_level": data_level,
+        #             "start_date": start_dt.strftime('%Y-%m-%d'),
+        #             "end_date": end_dt.strftime('%Y-%m-%d'),
+        #             "metrics": json.dumps(metrics),
+        #             "dimensions": json.dumps(dimensions),
+        #             "page_size": 1000,
+        #             "page": page
+        #         }
+
         if "start_date" not in params or "end_date" not in params:
             self.verbose.log("No start_date or end_date found in params. Making a direct request. IT MUST NOT EXCEED 30 DAYS PERIOD")
             return self._get_report_raw(params, max_retries)
@@ -305,6 +318,8 @@ class TikTokMarketing():
             if all_records:    
                 df = pd.json_normalize(all_records)
                 df.columns = [col.split('.')[-1] for col in df.columns]
+                # Revisar si necesitamos eliminar los 0s
+                df = df.sort_values(by=['ad_id', 'stat_time_day']).reset_index(drop=True)
                 self.verbose.log(f"Successfully extracted {len(df)} rows")
                 return df
             
