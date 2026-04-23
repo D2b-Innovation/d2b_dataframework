@@ -199,22 +199,7 @@ class TikTokMarketing():
 
     def get_report_json(self, params: dict, max_retries: int = 5):
         """Public method to retrieve raw JSON data with date chunking and pagination for debugging"""
-        # Evitar json.dumps en cada iteración, se asume que el usuario pasa los parámetros correctamente formateados.        
-        # Si no hay fechas en los parámetros, hacemos la llamada directa sin iterar
-
-        # params = {
-        #             "advertiser_id": advertiser_id,
-        #             "service_type": "AUCTION",
-        #             "report_type": "BASIC",
-        #             "data_level": data_level,
-        #             "start_date": start_dt.strftime('%Y-%m-%d'),
-        #             "end_date": end_dt.strftime('%Y-%m-%d'),
-        #             "metrics": json.dumps(metrics),
-        #             "dimensions": json.dumps(dimensions),
-        #             "page_size": 1000,
-        #             "page": page
-        #         }
-
+        
         if "start_date" not in params or "end_date" not in params:
             self.verbose.log("No start_date or end_date found in params. Making a direct request. IT MUST NOT EXCEED 30 DAYS PERIOD")
             return self._get_report_raw(params, max_retries)
@@ -226,6 +211,10 @@ class TikTokMarketing():
 
         # Usamos una copia para no mutar el diccionario original que pasa el usuario
         request_params = copy.deepcopy(params)
+
+        for key in ["metrics", "dimensions", "filtering"]:
+            if key in request_params and isinstance(request_params[key], list):
+                request_params[key] = json.dumps(request_params[key])
 
         while current_start <= end_dt:
             # Límite de 30 días por petición (current_start + 29 días)
