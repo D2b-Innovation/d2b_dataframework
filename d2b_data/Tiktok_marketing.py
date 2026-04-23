@@ -201,6 +201,7 @@ class TikTokMarketing():
         """Public method to retrieve raw JSON data with date chunking and pagination for debugging"""
         # Evitar json.dumps en cada iteración, se asume que el usuario pasa los parámetros correctamente formateados.        
         # Si no hay fechas en los parámetros, hacemos la llamada directa sin iterar
+
         if "start_date" not in params or "end_date" not in params:
             self.verbose.log("No start_date or end_date found in params. Making a direct request. IT MUST NOT EXCEED 30 DAYS PERIOD")
             return self._get_report_raw(params, max_retries)
@@ -256,68 +257,40 @@ class TikTokMarketing():
             }
         }
     
-        #     {
-        #     "advertiser_id":  "{{advertiser_id}}",
-        #     "service_type": "AUCTION",
-        #     "report_type": "BASIC",
-        #     "data_level": "AUCTION_ADGROUP",
-        #     "dimensions": [
-        #         "adgroup_id",
-        #         "stat_time_hour"
-        #     ],
-        #     "metrics": [
-        #         "spend",
-        #         "impressions",
-        #         "reach"
-        #     ],
-        #     "start_date": "{{start_date}}",
-        #     "end_date": "{{end_date}}",
-        #     "filtering": [
-        #         {
-        #             "field_name": "adgroup_ids",
-        #             "filter_type": "IN",
-        #             "filter_value": "[{{adgroup_id}},{{adgroup_id}}]"
-        #         },
-        #         {
-        #             "field_name": "adgroup_status",
-        #             "filter_type": "IN",
-        #             "filter_value": "[\"STATUS_DELIVERY_OK\"]"
-        #         }
-        #     ],
-        #     "query_lifetime": false,
-        #     "page": 1,
-        #     "page_size": 200
-        # }
-
 
     def get_report_dataframe(self, advertiser_id: str, start_date: str, end_date: str, dimensions: list, metrics: list, data_level: str = "AUCTION_AD"):
         """Extracts data and converts it into a formatted Pandas DataFrame"""
         start_dt = pd.to_datetime(start_date)
         end_dt = pd.to_datetime(end_date)
-        current_start = start_dt
-        all_records = []
-        # Modificar el método, para que cuando haya un error en la llamada, arroje el error y se detenga. 
-        while current_start <= end_dt:
-            current_end = min(current_start + pd.Timedelta(days=29), end_dt)
-            self.verbose.log(f"Extracting {current_start.date()} to {current_end.date()}")
-             
+        days_diff = (end_dt - start_dt).days
+        
+        # Whenever we want more complex queries, by default we use get_report_json
+        if "stat_time_day" not in dimensions:
+            if days_diff > 365:
+                raise ValueError("Cannot retrieve more than 365 days when query acumulated data")
+            
+            all_records = []
             page = 1
             while True:
+                
                 params = {
-                    "advertiser_id": advertiser_id,
-                    "service_type": "AUCTION",
-                    "report_type": "BASIC",
-                    "data_level": data_level,
-                    "start_date": current_start.strftime('%Y-%m-%d'),
-                    "end_date": current_end.strftime('%Y-%m-%d'),
-                    "metrics": json.dumps(metrics),
-                    "dimensions": json.dumps(dimensions),
-                    "page_size": 1000,
-                    "page": page
-                }
+                        "advertiser_id": advertiser_id,
+                        "service_type": "AUCTION",
+                        "report_type": "BASIC",
+                        "data_level": data_level,
+                        "start_date": start_dt.strftime('%Y-%m-%d'),
+                        "end_date": end_dt.strftime('%Y-%m-%d'),
+                        "metrics": json.dumps(metrics),
+                        "dimensions": json.dumps(dimensions),
+                        "page_size": 1000,
+                        "page": page
+                    }
 
                 data = self._get_report_raw(params)
 
+                if data == None:
+                    raise RuntimeError("Critical error found while downloading data")
+                
                 if not data or "list" not in data.get("data", {}):
                     break
 
@@ -329,16 +302,65 @@ class TikTokMarketing():
                 else:
                     break
 
-            current_start = current_end + pd.Timedelta(days=1)
-
-        if all_records:
-            df = pd.json_normalize(all_records)
-            df.columns = [col.split('.')[-1] for col in df.columns]
-            self.verbose.log(f"Successfully extracted {len(df)} rows")
-            return df
+            if all_records:    
+                df = pd.json_normalize(all_records)
+                df.columns = [col.split('.')[-1] for col in df.columns]
+                self.verbose.log(f"Successfully extracted {len(df)} rows")
+                return df
+            
+            self.verbose.log("No data found for this advertiser in the selected range.")
+            return pd.DataFrame()
         
-        self.verbose.log("No data found for the specified period")
-        return pd.DataFrame()
+        else:
+            all_records = []
+            current_start = start_dt
+            while current_start <= end_dt:
+                current_end = min(current_start + pd.Timedelta(days=29), end_dt)
+                self.verbose.log(f"Extracting {current_start.date()} to {current_end.date()}")
+                
+                
+                page = 1
+                while True:
+                    params = {
+                        "advertiser_id": advertiser_id,
+                        "service_type": "AUCTION",
+                        "report_type": "BASIC",
+                        "data_level": data_level,
+                        "start_date": current_start.strftime('%Y-%m-%d'),
+                        "end_date": current_end.strftime('%Y-%m-%d'),
+                        "metrics": json.dumps(metrics),
+                        "dimensions": json.dumps(dimensions),
+                        "page_size": 1000,
+                        "page": page,
+                        "query_lifetime": False 
+                    }
+
+                    data = self._get_report_raw(params)
+
+                    if data == None:
+                        raise RuntimeError("Critical error found while downloading data")
+
+                    if not data or "list" not in data.get("data", {}):
+                        break
+
+                    all_records.extend(data["data"]["list"])
+
+                    total_page = data.get("data", {}).get("page_info", {}).get("total_page", 1)
+                    if page < total_page:
+                        page += 1
+                    else:
+                        break
+
+                current_start = current_end + pd.Timedelta(days=1)
+
+            if all_records:
+                df = pd.json_normalize(all_records)
+                df.columns = [col.split('.')[-1] for col in df.columns]
+                self.verbose.log(f"Successfully extracted {len(df)} rows")
+                return df
+            
+            self.verbose.log("No data found for the specified period")
+            return pd.DataFrame()
 
 
 
