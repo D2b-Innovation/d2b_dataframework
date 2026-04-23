@@ -201,7 +201,7 @@ class TikTokMarketing():
         """Public method to retrieve raw JSON data with date chunking and pagination for debugging"""
         
         if "start_date" not in params or "end_date" not in params:
-            self.verbose.log("No start_date or end_date found in params. Making a direct request. IT MUST NOT EXCEED 30 DAYS PERIOD")
+            self.verbose.log("No start_date or end_date found in params. Making a direct request. IT MUST NOT EXCEED 365 DAYS PERIOD")
             return self._get_report_raw(params, max_retries)
 
         start_dt = pd.to_datetime(params["start_date"])
