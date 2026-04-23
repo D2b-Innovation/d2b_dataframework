@@ -11,6 +11,41 @@ import webbrowser
 from d2b_data.verbose_logger import Verbose
 
 class TikTokMarketing():
+    """
+    TikTok Marketing API Wrapper
+    ============================
+
+    A robust Python client for interacting with the TikTok Business API (v1.3), 
+    specifically designed for automated advertising performance reporting.
+
+    Key Technical Features:
+    ----------------------
+    * **OAuth2 Lifecycle Management:** Handles the full authentication flow, 
+        storing and loading credentials from local JSON files.
+    * **Rate Limit Resiliency:** Implements an exponential backoff strategy 
+        to handle HTTP 429 (Too Many Requests) errors gracefully.
+    * **Smart Date Chunking:** Automatically bypasses TikTok's 30-day limit 
+        on time-series queries by segmenting requests into valid date ranges.
+    * **Pagination Handling:** Transparently manages multi-page API responses 
+        to ensure complete data retrieval.
+    * **Pandas Integration:** Returns clean, analysis-ready DataFrames with 
+        automated column normalization and sorting.
+
+    Basic Implementation:
+    --------------------
+        >>> tt = TikTokMarketing(token_path="tiktok_credentials.json")
+        >>> df = tt.get_report_dataframe(
+        ...     advertiser_id="7289151914388865025",
+        ...     start_date="20260101",
+        ...     end_date="20260423",
+        ...     dimensions=["ad_id", "stat_time_day"],
+        ...     metrics=["spend", "impressions", "clicks"]
+        ... )
+
+    Author: D2B Data Engineering Team
+    Version: 1.0.0
+    License: Proprietary / Internal Use Only
+    """
     def __init__(self, token_path: str | None = None, verbose: bool = True):
         self.endpoint_base = "https://business-api.tiktok.com/open_api/v1.3/"
         self.token_path = token_path if token_path else "token_tiktok.json"
@@ -200,6 +235,9 @@ class TikTokMarketing():
     def get_report_json(self, params: dict, max_retries: int = 5):
         """Public method to retrieve raw JSON data with date chunking and pagination for debugging"""
         
+        # Evitar json.dumps en cada iteración, se asume que el usuario pasa los parámetros correctamente formateados.        
+        # Si no hay fechas en los parámetros, hacemos la llamada directa sin iterar
+
         if "start_date" not in params or "end_date" not in params:
             self.verbose.log("No start_date or end_date found in params. Making a direct request. IT MUST NOT EXCEED 365 DAYS PERIOD")
             return self._get_report_raw(params, max_retries)
