@@ -318,8 +318,6 @@ class TikTokMarketing():
             if all_records:    
                 df = pd.json_normalize(all_records)
                 df.columns = [col.split('.')[-1] for col in df.columns]
-                # Revisar si necesitamos eliminar los 0s
-                df = df.sort_values(by=['ad_id', 'stat_time_day']).reset_index(drop=True)
                 self.verbose.log(f"Successfully extracted {len(df)} rows")
                 return df
             
@@ -371,6 +369,8 @@ class TikTokMarketing():
             if all_records:
                 df = pd.json_normalize(all_records)
                 df.columns = [col.split('.')[-1] for col in df.columns]
+                # Revisar si necesitamos eliminar los 0s
+                df = df.sort_values(by=['ad_id', 'stat_time_day']).reset_index(drop=True)
                 self.verbose.log(f"Successfully extracted {len(df)} rows")
                 return df
             
