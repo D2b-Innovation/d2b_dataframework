@@ -172,7 +172,7 @@ class TikTokMarketing():
     def _get_report_raw(self, params: dict, max_retries: int = 5):
         """Low level internal API call handler"""
         url = f"{self.endpoint_base}report/integrated/get/"
-
+        # Revisar parámetros para evitar el json.dumps.
         for attempt in range(max_retries):
             try:
                 response = requests.get(url, headers=self.headers, params=params)
@@ -199,7 +199,7 @@ class TikTokMarketing():
 
     def get_report_json(self, params: dict, max_retries: int = 5):
         """Public method to retrieve raw JSON data with date chunking and pagination for debugging"""
-        
+        # Evitar json.dumps en cada iteración, se asume que el usuario pasa los parámetros correctamente formateados.        
         # Si no hay fechas en los parámetros, hacemos la llamada directa sin iterar
         if "start_date" not in params or "end_date" not in params:
             self.verbose.log("No start_date or end_date found in params. Making a direct request. IT MUST NOT EXCEED 30 DAYS PERIOD")
@@ -255,6 +255,40 @@ class TikTokMarketing():
                 "list": all_records
             }
         }
+    
+        #     {
+        #     "advertiser_id":  "{{advertiser_id}}",
+        #     "service_type": "AUCTION",
+        #     "report_type": "BASIC",
+        #     "data_level": "AUCTION_ADGROUP",
+        #     "dimensions": [
+        #         "adgroup_id",
+        #         "stat_time_hour"
+        #     ],
+        #     "metrics": [
+        #         "spend",
+        #         "impressions",
+        #         "reach"
+        #     ],
+        #     "start_date": "{{start_date}}",
+        #     "end_date": "{{end_date}}",
+        #     "filtering": [
+        #         {
+        #             "field_name": "adgroup_ids",
+        #             "filter_type": "IN",
+        #             "filter_value": "[{{adgroup_id}},{{adgroup_id}}]"
+        #         },
+        #         {
+        #             "field_name": "adgroup_status",
+        #             "filter_type": "IN",
+        #             "filter_value": "[\"STATUS_DELIVERY_OK\"]"
+        #         }
+        #     ],
+        #     "query_lifetime": false,
+        #     "page": 1,
+        #     "page_size": 200
+        # }
+
 
     def get_report_dataframe(self, advertiser_id: str, start_date: str, end_date: str, dimensions: list, metrics: list, data_level: str = "AUCTION_AD"):
         """Extracts data and converts it into a formatted Pandas DataFrame"""
@@ -262,11 +296,11 @@ class TikTokMarketing():
         end_dt = pd.to_datetime(end_date)
         current_start = start_dt
         all_records = []
-
+        # Modificar el método, para que cuando haya un error en la llamada, arroje el error y se detenga. 
         while current_start <= end_dt:
             current_end = min(current_start + pd.Timedelta(days=29), end_dt)
             self.verbose.log(f"Extracting {current_start.date()} to {current_end.date()}")
-
+             
             page = 1
             while True:
                 params = {
