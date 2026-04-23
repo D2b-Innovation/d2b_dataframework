@@ -6,7 +6,7 @@ import d2b_data.Google_Token_MNG
 from googleapiclient.errors import HttpError
 
 
-class Youtube_Api():
+class youtubeOrganic():
     def __init__(self, client_secret, token_json, debug=False, use_service_account=False):
         """
         Constructor for YouTube Analytics API Connector.
