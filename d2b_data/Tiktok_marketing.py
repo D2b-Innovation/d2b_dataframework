@@ -119,8 +119,7 @@ class TikTokMarketing():
                 "access_token": token_data.get("access_token"),
                 "app_id": app_id,
                 "secret": secret,
-                "scope": token_data.get("scope"),
-                "advertiser_ids": token_data.get("advertiser_ids") # Revisar si queremos guardar esta informació o no.
+                "scope": token_data.get("scope")
             }
             
             self.app_id = app_id
