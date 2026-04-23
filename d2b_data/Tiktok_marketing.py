@@ -80,8 +80,28 @@ class TikTokMarketing():
             self.verbose.log(f"Error during connection test: {e}")
             return False
 
-    def get_access_token(self, app_id: str, secret: str, auth_code: str):
-        """Exchanges auth_code for access_token and saves to JSON"""
+    def get_access_token(self, app_id: str, secret: str, auth_code: str | None = None, redirect_uri: str = "https://tiktok.cl"):
+        """Exchanges auth_code for access_token and saves to JSON. Interactively prompts if auth_code is missing."""
+        if not auth_code:
+                auth_url = f"https://business-api.tiktok.com/portal/auth?app_id={app_id}&state=auth_request&redirect_uri={urllib.parse.quote(redirect_uri, safe='')}"
+                self.verbose.log("Se requiere autorización manual. Mostrando instrucciones al usuario...")
+                print("\n" + "="*60)
+                print("TIKTOK AUTHENTICATION REQUIRED")
+                print("1. Open the following URL in your browser to authorize the app:")
+                print(f"\n{auth_url}\n")
+                try:
+                    webbrowser.open(auth_url)
+                except Exception as e:
+                    self.verbose.log(f"Couldn't open browser {e}")   
+                
+                print("\n2. Authorize the application. You will be redirected to a new URL (your callback).")
+                print("3. Look for the parameter '?auth_code=XXXXXXXXX' in the address bar of that new URL.")    
+                auth_code = input("\nPaste only the 'auth_code' value here and press Enter: ").strip()
+                print("="*60 + "\n")
+
+                if not auth_code:
+                        self.verbose.log("No code provided, aborting authentication process")
+
         url = f"{self.endpoint_base}oauth2/access_token/"
         payload = {
             "app_id": app_id,
@@ -95,13 +115,12 @@ class TikTokMarketing():
         if res_json.get("code") == 0:
             token_data = res_json.get('data', {})
             
-            # Prepare data for persistence
             save_data = {
                 "access_token": token_data.get("access_token"),
                 "app_id": app_id,
                 "secret": secret,
                 "scope": token_data.get("scope"),
-                "advertiser_ids": token_data.get("advertiser_ids")
+                "advertiser_ids": token_data.get("advertiser_ids") # Revisar si queremos guardar esta informació o no.
             }
             
             self.app_id = app_id
@@ -116,6 +135,11 @@ class TikTokMarketing():
             except Exception as e:
                 self.verbose.log(f"Error saving token to file: {e}")
 
+            if self._token_test_connection():
+                self.verbose.log("Token test connection succesfull")
+                return 200
+            else:
+                self.verbose.log("New token generated but failed connection test. Must be checked")
             return 200
         else:
             self.verbose.log(f"Error obtaining token: {res_json.get('message')}")
@@ -284,26 +308,5 @@ class TikTokMarketing():
         return pd.DataFrame()
 
 
-#   def auth_flow(self,redirect_uri=None,force_reset = False,token_filename="tiktok.token"):
-#     '''
-#     '''
-#     self._debug(f"auth_flow | start")
 
-#     if force_reset is False:
-#       if self.token is not None:
-#         print("Token is provided")
-#         return True
-
-#       if redirect_uri is None:
-#         redirect_uri = self.redirect
-
-#     print("Access to the following adreess and get the code:")
-#     print(self.get_authorization_url(redirect_uri))
-#     code = input("insert code: ")
-
-
-#     token = self.get_token(code)
-#     self._export_token(token_filename,token)
-#     self._debug(f"auth_flow: END with token = {token}")
-#     return token
 
