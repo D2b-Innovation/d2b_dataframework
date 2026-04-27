@@ -7,7 +7,6 @@ import time
 import random
 import os
 import webbrowser
-# test de commit fuera
 from d2b_data.verbose_logger import Verbose
 
 class TikTokMarketing():
@@ -60,17 +59,15 @@ class TikTokMarketing():
             workflow_name="TikTokMarketing class"
         )
 
-        if os.path.isfile(self.token_path):
+        if token_path and os.path.isfile(self.token_path):
             self._load_token_from_file()
             if self.token:
-                if self._token_test_connection():
-                    self.headers["Access-Token"] = self.token
-                    self.verbose.log(f"TikTok Class instantiated with token from {self.token_path}, ready to retrieve data.")
-                else:
-                    self.verbose.log("Invalid token. New token must be generated")
-                    self.token = None
+                self.headers["Access-Token"] = self.token
+                self.verbose.log(f"TikTok Class instantiated with token from {self.token_path}.")
+        elif token_path:
+            self.verbose.log(f"Token file specified at {self.token_path} not found. Use get_access_token method to generate and save a new token")    
         else:
-            self.verbose.log(f"No token file found at {self.token_path}. New token must be generated")
+            self.verbose.log(f"No token file found at {self.token_path}. Use get_access_token method to generate and save a new token")
 
     def _load_token_from_file(self):
         """Reads token and credentials from file"""
