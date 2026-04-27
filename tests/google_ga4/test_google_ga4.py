@@ -157,3 +157,54 @@ def test_get_single_report_with_sampling_returns_data_and_sampling_cols(ga4, raw
                    'sampled', 'dataLossFromOtherRow']
     
     assert all(col in result.columns for col in sampling_cols)
+
+def test_get_paginated_report_returns_concatenated_dataframe(ga4, df_fake):
+    """Tests that get paginated report returns all pages and the correct DataFrame"""
+    
+    
+    query = {
+    "requests": [{
+        "dateRanges": [{"startDate": "2024-01-01", "endDate": "2024-01-02"}]
+    }]
+    }
+
+    ga4._get_all_rows_for_day = MagicMock(return_value=[df_fake])
+    result = ga4._get_paginated_report("properties/123", query)
+
+    assert ga4._get_all_rows_for_day.call_count == 2 
+    assert not result.empty
+    assert list(result.columns) == ['date', 'city', 'sessions'] 
+
+def test_get_paginated_report_no_rows(ga4):
+    """Tests that get paginated report returns an empty DataFrame when there are no rows"""
+    
+    query = {
+    "requests": [{
+        "dateRanges": [{"startDate": "2024-01-01", "endDate": "2024-01-02"}]
+    }]
+    }
+
+    ga4._get_all_rows_for_day = MagicMock(return_value=[]) 
+    result = ga4._get_paginated_report("properties/123", query)
+
+    assert ga4._get_all_rows_for_day.call_count == 2 
+    assert result.empty
+
+def test_create_daily__create_daily_query(ga4):
+    """Tests that the daily query is created correctly"""
+    
+    query = {
+        "requests": [{
+            "dimensions": [{"name": "date"}, {"name": "city"}],
+            "metrics": [{"name": "sessions"}],
+            "dateRanges": [{"startDate": "2024-01-01", "endDate": "2024-01-31"}] 
+        }]
+    }
+
+    start_date = "2025-01-01"
+    end_date = "2025-01-01"
+
+    result = ga4._create_daily_query(query, start_date, end_date)
+
+    assert result['requests'][0]['dateRanges'][0]['startDate'] == start_date
+    assert result['requests'][0]['dateRanges'][0]['endDate'] == end_date
