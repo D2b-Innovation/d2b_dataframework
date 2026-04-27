@@ -47,7 +47,7 @@ class TikTokMarketing():
     """
     def __init__(self, token_path: str | None = None, verbose: bool = True):
         self.endpoint_base = "https://business-api.tiktok.com/open_api/v1.3/"
-        self.token_path = token_path if token_path else "token_tiktok.json"
+        self.token_path = token_path
         self.token = None
         self.app_id = None
         self.secret = None
@@ -65,9 +65,9 @@ class TikTokMarketing():
                 self.headers["Access-Token"] = self.token
                 self.verbose.log(f"TikTok Class instantiated with token from {self.token_path}.")
         elif token_path:
-            self.verbose.log(f"Token file specified at {self.token_path} not found. Use get_access_token method to generate and save a new token")    
-        else:
             self.verbose.log(f"No token file found at {self.token_path}. Use get_access_token method to generate and save a new token")
+        else:
+            self.verbose.log(f"Token file not specified. Use get_access_token method to generate and save a new token")    
 
     def _load_token_from_file(self):
         """Reads token and credentials from file"""
@@ -111,6 +111,41 @@ class TikTokMarketing():
         except Exception as e:
             self.verbose.log(f"Error during connection test: {e}")
             return False
+        
+    def _get_report_raw(self, params: dict, max_retries: int = 5):
+        """Low level internal API call handler"""
+        url = f"{self.endpoint_base}report/integrated/get/"
+        # Revisar parámetros para evitar el json.dumps.
+        for attempt in range(max_retries):
+            try:
+                response = requests.get(url, headers=self.headers, params=params)
+
+                if response.status_code == 429:
+                    wait_time = (2 ** attempt) + random.random()
+                    self.verbose.log(f"Rate limit exceeded. Retrying in {wait_time:.2f} seconds")
+                    time.sleep(wait_time)
+                    continue
+
+                response.raise_for_status()
+                data = response.json()
+
+                if data.get("code") != 0:
+                    self.verbose.log(f"TikTok API Error: {data.get('message')} (Code: {data.get('code')})")
+                    return None
+
+                return data
+
+            except Exception as e:
+                self.verbose.log(f"Request failed: {e}")
+                return None
+        return None
+        
+    def validate_connection(self) -> bool:
+        """Public method to validate current token connection"""
+        if not self.token:
+            self.verbose.log("No token available to validate connection")
+            return False
+        return self._token_test_connection()
 
     def get_access_token(self, app_id: str, secret: str, auth_code: str | None = None, redirect_uri: str = "https://tiktok.cl"):
         """Exchanges auth_code for access_token and saves to JSON. Interactively prompts if auth_code is missing."""
@@ -200,34 +235,6 @@ class TikTokMarketing():
         if data.get("code") == 0:
             return data.get('data', {}).get('list', [])
         return []
-
-    def _get_report_raw(self, params: dict, max_retries: int = 5):
-        """Low level internal API call handler"""
-        url = f"{self.endpoint_base}report/integrated/get/"
-        # Revisar parámetros para evitar el json.dumps.
-        for attempt in range(max_retries):
-            try:
-                response = requests.get(url, headers=self.headers, params=params)
-
-                if response.status_code == 429:
-                    wait_time = (2 ** attempt) + random.random()
-                    self.verbose.log(f"Rate limit exceeded. Retrying in {wait_time:.2f} seconds")
-                    time.sleep(wait_time)
-                    continue
-
-                response.raise_for_status()
-                data = response.json()
-
-                if data.get("code") != 0:
-                    self.verbose.log(f"TikTok API Error: {data.get('message')} (Code: {data.get('code')})")
-                    return None
-
-                return data
-
-            except Exception as e:
-                self.verbose.log(f"Request failed: {e}")
-                return None
-        return None
 
     def get_report_json(self, params: dict, max_retries: int = 5):
         """Public method to retrieve raw JSON data with date chunking and pagination for debugging"""
