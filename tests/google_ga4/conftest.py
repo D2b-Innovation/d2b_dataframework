@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 
 @pytest.fixture
 def ga4(mocker):
-    # Interceptamos Google_Token_MNG antes de que __init__ lo llame
     mock_token_mng = MagicMock()
     mock_token_mng.get_service.return_value = MagicMock()
 

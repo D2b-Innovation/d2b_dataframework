@@ -121,14 +121,14 @@ def test_get_report_raw_exception(tiktok, mocker):
 
 def test_get_report_dataframe_no_date_dimension_365_plus_days_error(tiktok):
     """Checks that user can't query more than 365 days without stat_time_day mode"""
+    
     start_date = "2025-01-01"
     end_date = "2026-02-01"
     dimensions = ["ad_id"]
     metrics = ["spend", "impressions", "clicks"]
-
-    result = tiktok.get_report_dataframe(start_date, end_date, dimensions=dimensions, metrics=metrics)
+    advertiser_id = "user/12345"
     
     with pytest.raises(ValueError):
-        tiktok.get_report_dataframe(start_date, end_date, dimensions=dimensions, metrics=metrics)
+        tiktok.get_report_dataframe(advertiser_id, start_date, end_date, dimensions=dimensions, metrics=metrics)
     
     #mocker.patch("d2b_data.Tiktok_marketing.TikTokMarketing._token_test_connection", return_value=True)

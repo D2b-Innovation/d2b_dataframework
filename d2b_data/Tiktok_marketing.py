@@ -115,7 +115,6 @@ class TikTokMarketing():
     def _get_report_raw(self, params: dict, max_retries: int = 5):
         """Low level internal API call handler"""
         url = f"{self.endpoint_base}report/integrated/get/"
-        # Revisar parámetros para evitar el json.dumps.
         for attempt in range(max_retries):
             try:
                 response = requests.get(url, headers=self.headers, params=params)
@@ -210,7 +209,6 @@ class TikTokMarketing():
         else:
             self.verbose.log(f"Error obtaining token: {res_json.get('message')}")
             return True
-    # Se debe implementar el input en el auth code
 
     def get_authorized_advertisers(self, app_id: str | None = None, secret: str | None = None):
         """Public method that returns a list of advertisers accessible by the current token"""
@@ -237,7 +235,8 @@ class TikTokMarketing():
         return []
 
     def get_report_json(self, params: dict, max_retries: int = 5):
-        """Public method to retrieve raw JSON data with date chunking and pagination for debugging"""
+        """Public method to retrieve raw JSON data with date chunking and pagination for debugging
+        **Any complex query (like using filters) must be done through this method."""
         
         # Evitar json.dumps en cada iteración, se asume que el usuario pasa los parámetros correctamente formateados.        
         # Si no hay fechas en los parámetros, hacemos la llamada directa sin iterar
