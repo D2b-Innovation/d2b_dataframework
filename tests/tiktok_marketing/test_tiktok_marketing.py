@@ -9,7 +9,7 @@ def test_instance_is_created_with_valid_token(tiktok):
     assert tiktok.headers['Access-Token'] == "fake_token_123"
 
 
-def test_instance_is_created_with_no_token(tiktok_no_file):
+def test_instance_is_created_with_no_token_found(tiktok_no_file):
     """Instance with no token found in root"""
 
     assert tiktok_no_file.token is None
@@ -112,9 +112,23 @@ def test_get_report_error_code_tiktok(tiktok, mocker):
     assert result is None
 
 def test_get_report_raw_exception(tiktok, mocker):
-    """Errors everywhere"""
+    """Tests the correct implementation on error handling during extraction"""
     mocker.patch("d2b_data.Tiktok_marketing.requests.get", side_effect=Exception("Error Message"))
 
     result = tiktok._get_report_raw(params={})
 
     assert result is None
+
+def test_get_report_dataframe_no_date_dimension_365_plus_days_error(tiktok):
+    """Checks that user can't query more than 365 days without stat_time_day mode"""
+    start_date = "2025-01-01"
+    end_date = "2026-02-01"
+    dimensions = ["ad_id"]
+    metrics = ["spend", "impressions", "clicks"]
+
+    result = tiktok.get_report_dataframe(start_date, end_date, dimensions=dimensions, metrics=metrics)
+    
+    with pytest.raises(ValueError):
+        tiktok.get_report_dataframe(start_date, end_date, dimensions=dimensions, metrics=metrics)
+    
+    #mocker.patch("d2b_data.Tiktok_marketing.TikTokMarketing._token_test_connection", return_value=True)
