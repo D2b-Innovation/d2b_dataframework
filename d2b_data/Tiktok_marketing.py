@@ -47,7 +47,7 @@ class TikTokMarketing():
     """
     def __init__(self, token_path: str | None = None, verbose: bool = True):
         self.endpoint_base = "https://business-api.tiktok.com/open_api/v1.3/"
-        self.token_path = token_path
+        self.token_path = token_path if token_path is not None else "token_tiktok.json" # Cambio aquí
         self.token = None
         self.app_id = None
         self.secret = None
@@ -59,7 +59,7 @@ class TikTokMarketing():
             workflow_name="TikTokMarketing class"
         )
 
-        if token_path and os.path.isfile(self.token_path):
+        if token_path: # Cambio aquí
             self._load_token_from_file()
             if self.token:
                 self.headers["Access-Token"] = self.token
@@ -167,6 +167,7 @@ class TikTokMarketing():
 
                 if not auth_code:
                         self.verbose.log("No code provided, aborting authentication process")
+                        return False # Cambio aquí
 
         url = f"{self.endpoint_base}oauth2/access_token/"
         payload = {
@@ -202,13 +203,13 @@ class TikTokMarketing():
 
             if self._token_test_connection():
                 self.verbose.log("Token test connection succesfull")
-                return 200
+                return True # Cambio Aqui
             else:
                 self.verbose.log("New token generated but failed connection test. Must be checked")
-            return 200
+            return True # Cambio Aqui
         else:
             self.verbose.log(f"Error obtaining token: {res_json.get('message')}")
-            return True
+            return False # Cambio Aqui
 
     def get_authorized_advertisers(self, app_id: str | None = None, secret: str | None = None):
         """Public method that returns a list of advertisers accessible by the current token"""
@@ -400,7 +401,7 @@ class TikTokMarketing():
                 df = pd.json_normalize(all_records)
                 df.columns = [col.split('.')[-1] for col in df.columns]
                 # Revisar si necesitamos eliminar los 0s
-                df = df.sort_values(by=['ad_id', 'stat_time_day']).reset_index(drop=True)
+                df = df.sort_values(by=['stat_time_day']).reset_index(drop=True)
                 self.verbose.log(f"Successfully extracted {len(df)} rows")
                 return df
             
