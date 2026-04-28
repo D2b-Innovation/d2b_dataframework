@@ -1,4 +1,3 @@
-
 import pytest
 from unittest.mock import MagicMock
 
@@ -11,7 +10,6 @@ def tiktok(mocker):
 
     mocker.patch("os.path.isfile", return_value=True)
     mocker.patch("d2b_data.Tiktok_marketing.TikTokMarketing._load_token_from_file", fake_load_token)
-    mocker.patch("d2b_data.Tiktok_marketing.TikTokMarketing._token_test_connection", return_value=True)
 
     from d2b_data.Tiktok_marketing import TikTokMarketing
     return TikTokMarketing(token_path="fake_token.json")
@@ -25,7 +23,6 @@ def tiktok_false(mocker):
 
     mocker.patch("os.path.isfile", return_value=True)
     mocker.patch("d2b_data.Tiktok_marketing.TikTokMarketing._load_token_from_file", fake_load_token)
-    mocker.patch("d2b_data.Tiktok_marketing.TikTokMarketing._token_test_connection", return_value=False)
 
     from d2b_data.Tiktok_marketing import TikTokMarketing
     return TikTokMarketing(token_path="fake_token.json")
@@ -36,3 +33,10 @@ def tiktok_no_file(mocker):
 
     from d2b_data.Tiktok_marketing import TikTokMarketing
     return TikTokMarketing()
+
+@pytest.fixture
+def tiktok_no_token(mocker):
+    mocker.patch("os.path.isfile", return_value=False)
+
+    from d2b_data.Tiktok_marketing import TikTokMarketing
+    return TikTokMarketing(token_path="fake_token.json")
