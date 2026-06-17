@@ -1,6 +1,5 @@
 import logging
-from datetime import UTC, datetime, timedelta
-from typing import Optional
+from datetime import UTC, datetime
 
 import pandas as pd
 import requests
@@ -20,25 +19,6 @@ class FacebookOrganic:
         base_url: Base URL for the Graph API, pinned to v25.0.
     """
 
-    BASE_URL = "https://graph.facebook.com/v25.0"
-
-    POST_FIELDS = "id,message,created_time,like_count,comments_count,shares"
-
-    INSIGHT_METRICS = [
-        "post_impressions_unique",
-        "post_impressions_organic_unique",
-        "post_impressions_paid_unique",
-        "post_clicks",
-        "post_fan_reach",
-        "post_media_view",
-        "post_video_views_organic",
-        "post_video_views_paid",
-        "post_video_complete_views_organic",
-        "post_video_avg_time_watched",
-        "post_video_views_unique",
-        "post_reactions_by_type_total",
-    ]
-
     def __init__(
         self,
         page_id: str,
@@ -55,6 +35,8 @@ class FacebookOrganic:
         """
         self.page_id = page_id
         self.access_token = access_token
+        self.POST_FIELDS = "id,message,created_time,like_count,comments_count,shares"
+        self.BASE_URL = "https://graph.facebook.com/v25.0"
         self.verbose = (
             verbose_logger if verbose_logger else self._build_default_logger()
         )
@@ -253,31 +235,25 @@ class FacebookOrganic:
         self.verbose.log(f"get_posts | Retrieved {len(posts)} posts")
         return posts
 
-    def get_post_insights(
-        self,
-        post_id: str,
-        metrics: Optional[list[str]] = None,
-    ) -> dict:
+    def get_post_insights(self, post_id: str, metrics: list[str]) -> dict:
         """Retrieve lifetime insight metrics for a single post.
 
         Args:
             post_id: The full post ID in the format '{page_id}_{post_id}'.
-            metrics: List of metric names to request. Defaults to
-                INSIGHT_METRICS if not provided.
+            metrics: List of metric names to request.
 
         Returns:
             Flat dictionary of metric names to their lifetime values.
             Returns an empty dict if the request fails, so callers can
             continue processing remaining posts.
         """
-        metrics_to_use = metrics if metrics is not None else self.INSIGHT_METRICS
 
         self.verbose.log(
-            f"get_post_insights | Fetching {len(metrics_to_use)} metrics for {post_id}"
+            f"get_post_insights | Fetching {len(metrics)} metrics for {post_id}"
         )
 
         params = {
-            "metric": ",".join(metrics_to_use),
+            "metric": ",".join(metrics),
             "period": "lifetime",
         }
 
@@ -296,15 +272,15 @@ class FacebookOrganic:
 
     def get_report_dataframe(
         self,
-        since: Optional[str] = None,
-        until: Optional[str] = None,
-        metrics: Optional[list[str]] = None,
+        start_date: str,
+        end_date: str,
+        metrics: str,
         engagement: bool = False,
     ) -> pd.DataFrame:
         """Build a combined DataFrame of posts and their insight metrics.
 
         If since/until are not provided, defaults to the last 30 days
-        up to yesterday. Metrics default to INSIGHT_METRICS if not specified.
+        up to yesterday.
 
         Engagement rate is calculated as:
             (like_count + comments_count + shares + post_clicks)
@@ -325,12 +301,40 @@ class FacebookOrganic:
             metadata (message, created_time, etc.) and all insight metrics.
             Returns an empty DataFrame if no posts are found.
         """
-        yesterday = datetime.now(UTC).date() - timedelta(days=1)
-        default_since = yesterday - timedelta(days=30)
 
-        since = since or default_since.strftime("%Y-%m-%d")
-        until = until or yesterday.strftime("%Y-%m-%d")
+        if start_date:
+            try:
+                since = datetime.strptime(start_date, "%Y-%m-%d")
+                since = since.strftime("%Y-%m-%d")
+            except ValueError:
+                try:
+                    since = datetime.strptime(start_date, "%Y%m%d")
+                    since = since.strftime("%Y-%m-%d")
+                except ValueError:
+                    raise ValueError(
+                        "Expected 'start_date' value\n"
+                        "accepted values: 'AAAA-MM-DD' o 'AAAAMMDD'."
+                    )
+        else:
+            raise ValueError("'start date' argument must be provided")
 
+        if end_date:
+            try:
+                until = datetime.strptime(end_date, "%Y-%m-%d")
+                until = until.strftime("%Y-%m-%d")
+            except ValueError:
+                try:
+                    until = datetime.strptime(end_date, "%Y%m%d")
+                    until = until.strftime("%Y-%m-%d")
+                except ValueError:
+                    raise ValueError(
+                        "Expected 'end_date' value\n"
+                        "accepted values: 'AAAA-MM-DD' o 'AAAAMMDD'."
+                    )
+        else:
+            raise ValueError("'end date' argument must be provided")
+
+        # until = datetime.strftime(end_date, "%Y-%m-%d")
         self.verbose.log(
             f"get_report_dataframe | Starting report for page {self.page_id} "
             f"from {since} to {until} | engagement={engagement}"

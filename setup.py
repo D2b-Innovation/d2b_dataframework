@@ -16,7 +16,6 @@ setup(
         'facebook_business',
         'future',
         'twitter-ads',
-        'future',
 
     ]
 )

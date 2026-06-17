@@ -1,5 +1,4 @@
 import pandas as pd
-from prophet import Prophet
 import pickle
 import os
 from pathlib import Path
@@ -81,6 +80,10 @@ class ProphetForecaster:
 
             df_train = self.df_ready[['ds', metric]].rename(columns = {metric: 'y'})
             print(f" Column {metric} renamed succesfully to 'y'")
+            try:
+                from prophet import Prophet
+            except ImportError:
+                raise ImportError("prophet is required for forecasting: pip install prophet")
             m = Prophet()
             print(f" Class Prophet instanciated")
             m.fit(df_train)
