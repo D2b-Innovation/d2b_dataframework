@@ -285,30 +285,14 @@ class FacebookOrganic:
             return {}
 
     def get_report_dataframe(
-        self,
-        start_date: str,
-        end_date: str,
-        metrics: str,
-        engagement: bool = False,
+        self, start_date: str, end_date: str, metrics: list[str]
     ) -> pd.DataFrame:
         """Build a combined DataFrame of posts and their insight metrics.
 
-        If since/until are not provided, defaults to the last 30 days
-        up to yesterday.
-
-        Engagement rate is calculated as:
-            (like_count + comments_count + shares + post_clicks)
-            / post_impressions_unique
-        and is only added when engagement=True and the required columns exist.
-
         Args:
-            since: Start date in 'YYYY-MM-DD' format. Defaults to 30 days ago.
-            until: End date in 'YYYY-MM-DD' format. Defaults to yesterday.
+            start_date: Start date in 'YYYY-MM-DD' format or 'YYYYMMDD' format.
+            end_date: End date in 'YYYY-MM-DD' format or 'YYYYMMDD' format.
             metrics: List of insight metric names to request per post.
-                Defaults to INSIGHT_METRICS if not provided.
-            engagement: If True, appends an 'engagement_rate' column
-                calculated from interactions over impressions. Defaults
-                to False.
 
         Returns:
             DataFrame where each row is a post, with columns for post
@@ -348,10 +332,9 @@ class FacebookOrganic:
         else:
             raise ValueError("'end date' argument must be provided")
 
-        # until = datetime.strftime(end_date, "%Y-%m-%d")
         self.verbose.log(
             f"get_report_dataframe | Starting report for page {self.page_id} "
-            f"from {since} to {until} | engagement={engagement}"
+            f"from {since} to {until}"
         )
 
         posts = self.get_posts(since, until)
@@ -375,7 +358,8 @@ class FacebookOrganic:
                 "message": post.get("message", ""),
                 "created_time": post.get("created_time", ""),
                 "like_count": post.get("like_count", 0),
-                "comments_count": post.get("comments_count", 0),
+                "comments": post.get("comments", 0),
+                "reactions": post.get("reactions", 0),
                 "shares": post.get("shares", 0),
                 **insights,
             }
@@ -384,50 +368,7 @@ class FacebookOrganic:
         df = pd.DataFrame(records)
         df["created_time"] = pd.to_datetime(df["created_time"], utc=True)
 
-        if engagement:
-            df = self._add_engagement_rate(df)
-
         self.verbose.log(f"get_report_dataframe | Done. DataFrame shape: {df.shape}")
-        return df
-
-    def _add_engagement_rate(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Append an engagement_rate column to the DataFrame.
-
-        Engagement rate = (likes + comments + shares + clicks)
-                          / impressions_unique
-
-        Columns are used only if present — missing ones are treated as 0.
-        Rows with zero impressions get NaN to avoid division by zero.
-
-        Args:
-            df: DataFrame produced by get_report_dataframe.
-
-        Returns:
-            Same DataFrame with an additional 'engagement_rate' column.
-        """
-        interaction_cols = [
-            "like_count",
-            "comments_count",
-            "shares",
-            "post_clicks",
-        ]
-
-        # Sum only the columns that actually exist in the DataFrame
-        available_cols = [c for c in interaction_cols if c in df.columns]
-        interactions = df[available_cols].fillna(0).sum(axis=1)
-
-        impressions = df.get("post_impressions_unique", pd.Series(0, index=df.index))
-        impressions = impressions.fillna(0)
-
-        # Avoid division by zero — rows with 0 impressions get NaN
-        df["engagement_rate"] = interactions.where(impressions > 0) / impressions.where(
-            impressions > 0
-        )
-
-        self.verbose.log(
-            f"_add_engagement_rate | engagement_rate column added using "
-            f"columns: {available_cols}"
-        )
         return df
 
     def __repr__(self):
