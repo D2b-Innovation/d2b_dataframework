@@ -9,6 +9,7 @@ setup(
         'pandas',
         'oauth2client',
         'google-api-python-client',
+        'google-auth-oauthlib',
         'google-analytics-data',
         'google-cloud',
         'google-cloud-core',
