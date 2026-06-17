@@ -35,7 +35,7 @@ class FacebookOrganic:
         """
         self.page_id = page_id
         self.access_token = access_token
-        self.POST_FIELDS = "id,message,created_time,like_count,comments_count,shares"
+        self.POST_FIELDS = "id,message,created_time,like_count,comments_count,shares,comments.summary(true),reactions.summary(true)"
         self.BASE_URL = "https://graph.facebook.com/v25.0"
         self.verbose = (
             verbose_logger if verbose_logger else self._build_default_logger()
@@ -231,6 +231,20 @@ class FacebookOrganic:
                 post["shares"] = raw_shares.get("count", 0)
             elif raw_shares is None:
                 post["shares"] = 0
+
+            raw_comments = post.get("comments")
+            if isinstance(raw_comments, dict):
+                post["comments"] = raw_comments.get("summary", {}).get("total_count", 0)
+            elif raw_comments is None:
+                post["comments"] = 0
+
+            raw_reactions = post.get("reactions")
+            if isinstance(raw_reactions, dict):
+                post["reactions"] = raw_reactions.get("summary", {}).get(
+                    "total_count", 0
+                )
+            elif raw_reactions is None:
+                post["reactions"] = 0
 
         self.verbose.log(f"get_posts | Retrieved {len(posts)} posts")
         return posts
