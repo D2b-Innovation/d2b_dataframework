@@ -1,6 +1,7 @@
 # D2B Data Framework 🚀
 
-[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://github.com/D2b-Innovation/d2b_dataframework/actions/workflows/tests.yml/badge.svg)](https://github.com/D2b-Innovation/d2b_dataframework/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Organization](https://img.shields.io/badge/Org-D2b--Innovation-black.svg)](https://github.com/D2b-Innovation)
 
@@ -31,15 +32,16 @@ pip install git+[https://github.com/D2b-Innovation/d2b_dataframework.git](https:
 
 | Module | Main Class | Description |
 | --- | --- | --- |
-| 🔵 **Facebook** | `Facebook_Marketing` | Manage Ads Insights and campaign data. |
+| 🔵 **Facebook Ads** | `Facebook_Marketing` | Manage Ads Insights and campaign data. |
+| 🌿 **Facebook Organic** | `FacebookOrganic` | Page Insights via Graph API — posts, reactions, impressions, reach. |
 | 📊 **GA4** | `Google_GA4` | Fetch reports and real-time analytics data. |
 | ☁️ **BigQuery** | `Google_Bigquery` | Streamline SQL queries and data uploads. |
-| 📈 **Google Analytics** | `Google_Analytics` | Legacy Universal Analytics support. |
 | 📝 **Sheets** | `Google_Spreadsheet` | Read/Write operations on Google Sheets. |
 | 🔑 **Auth** | `Google_Token_MNG` | Manage OAuth2 tokens and credentials. |
 | 💼 **LinkedIn** | `Linkedin_Marketing` | Extract B2B marketing performance metrics. |
-| 🎵 **TikTok** | `Tiktok` | Integration with TikTok Ads API. |
+| 🎵 **TikTok** | `TikTokMarketing` | Integration with TikTok Ads API. |
 | 🐦 **X (Twitter)** | `X_ads` | Handle X Ads data reporting. |
+| 🔮 **Forecasting** | `ProphetForecaster` | Time-series forecasting with Meta Prophet (optional: `pip install prophet`). |
 
 ---
 
@@ -48,17 +50,31 @@ pip install git+[https://github.com/D2b-Innovation/d2b_dataframework.git](https:
 ```python
 from d2b_data.Google_GA4 import Google_GA4
 
-# 1. Initialize the client
 ga4_client = Google_GA4('client_secret.json', 'token.json')
 
-# 2. Fetch data
 property_id = 'properties/YOUR_PROPERTY_ID'
 query = { "dimensions": [{"name": "city"}], "metrics": [{"name": "activeUsers"}] }
 
 df = ga4_client.get_report_df(property_id, query, realtime=True)
 print(df.head())
-
 ```
+
+### Facebook Organic (Page Insights)
+
+```python
+from d2b_data.FacebookOrganic import FacebookOrganic
+
+client = FacebookOrganic(
+    page_id="YOUR_PAGE_ID",
+    access_token="YOUR_PAGE_ACCESS_TOKEN",
+)
+
+# Pull a consolidated DataFrame with post metrics + insights
+df = client.get_report_dataframe(since="2024-01-01", until="2024-01-31")
+print(df.head())
+```
+
+Requires a Page Access Token with `pages_read_engagement` and `read_insights` permissions.
 
 ---
 
