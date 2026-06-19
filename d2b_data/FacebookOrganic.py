@@ -21,7 +21,6 @@ class FacebookOrganic:
 
     def __init__(
         self,
-        page_id: str,
         access_token: str,
         verbose_logger=None,
     ) -> None:
@@ -33,7 +32,6 @@ class FacebookOrganic:
             verbose_logger: Optional logger instance. Must expose a .log()
                 and .critical() method. If None, falls back to stdlib logging.
         """
-        self.page_id = page_id
         self.access_token = access_token
         self.POST_FIELDS = "id,message,created_time,like_count,comments_count,shares,comments.summary(true),reactions.summary(true)"
         self.BASE_URL = "https://graph.facebook.com/v25.0"
@@ -199,13 +197,14 @@ class FacebookOrganic:
     # Public methods
     # ------------------------------------------------------------------
 
-    def get_posts(self, since: str, until: str) -> list[dict]:
+    def get_posts(self, page_id: str, since: str, until: str) -> list[dict]:
         """Retrieve all posts published within a date range.
 
         Fetches id, message, created_time, like_count, comments_count,
         and shares for every post. Handles pagination automatically.
 
         Args:
+            page_id: The ID of the Facebook page.
             since: Start date in 'YYYY-MM-DD' format (inclusive).
             until: End date in 'YYYY-MM-DD' format (inclusive).
 
@@ -222,7 +221,7 @@ class FacebookOrganic:
             "limit": 100,
         }
 
-        posts = self._paginate(f"/{self.page_id}/posts", params)
+        posts = self._paginate(f"/{page_id}/posts", params)
 
         # Normalize shares: API returns {"count": N} or is absent
         for post in posts:
@@ -285,11 +284,12 @@ class FacebookOrganic:
             return {}
 
     def get_report_dataframe(
-        self, start_date: str, end_date: str, metrics: list[str]
+        self, page_id: str, start_date: str, end_date: str, metrics: list[str]
     ) -> pd.DataFrame:
         """Build a combined DataFrame of posts and their insight metrics.
 
         Args:
+            page_id: The ID of the Facebook page.
             start_date: Start date in 'YYYY-MM-DD' format or 'YYYYMMDD' format.
             end_date: End date in 'YYYY-MM-DD' format or 'YYYYMMDD' format.
             metrics: List of insight metric names to request per post.
@@ -333,11 +333,11 @@ class FacebookOrganic:
             raise ValueError("'end date' argument must be provided")
 
         self.verbose.log(
-            f"get_report_dataframe | Starting report for page {self.page_id} "
+            f"get_report_dataframe | Starting report for page {page_id} "
             f"from {since} to {until}"
         )
 
-        posts = self.get_posts(since, until)
+        posts = self.get_posts(page_id, since, until)
 
         if not posts:
             self.verbose.log(
@@ -354,7 +354,7 @@ class FacebookOrganic:
 
             record = {
                 "post_id": post_id,
-                "page_id": self.page_id,
+                "page_id": page_id,
                 "message": post.get("message", ""),
                 "created_time": post.get("created_time", ""),
                 "like_count": post.get("like_count", 0),
@@ -372,4 +372,4 @@ class FacebookOrganic:
         return df
 
     def __repr__(self):
-        return f"<FacebookOrganic page_id={self.page_id}>"
+        return f"<FacebookOrganic Client version: {self.BASE_URL}>"
