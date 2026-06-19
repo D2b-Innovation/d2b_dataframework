@@ -1,17 +1,32 @@
-import pytest
-import pandas as pd
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 
+import pandas as pd
+import pytest
 
 # ---------------------------------------------------------------------------
 # get_report_dataframe — happy path
 # ---------------------------------------------------------------------------
 
+
 def test_get_report_dataframe_returns_dataframe(fb, base_params, mocker):
     """Normal report with data returns a populated DataFrame."""
     raw = [
-        {"impressions": "1000", "clicks": "50", "spend": "20.5", "date_start": "2024-01-01", "date_stop": "2024-01-01", "account_id": "123"},
-        {"impressions": "2000", "clicks": "80", "spend": "35.0", "date_start": "2024-01-02", "date_stop": "2024-01-02", "account_id": "123"},
+        {
+            "impressions": "1000",
+            "clicks": "50",
+            "spend": "20.5",
+            "date_start": "2024-01-01",
+            "date_stop": "2024-01-01",
+            "account_id": "123",
+        },
+        {
+            "impressions": "2000",
+            "clicks": "80",
+            "spend": "35.0",
+            "date_start": "2024-01-02",
+            "date_stop": "2024-01-02",
+            "account_id": "123",
+        },
     ]
     mocker.patch.object(fb, "get_report", return_value=raw)
     df = fb.get_report_dataframe(base_params)
@@ -32,9 +47,8 @@ def test_get_report_dataframe_empty_report_returns_empty_df(fb, base_params, moc
         assert col in df.columns
 
 
-# ---------------------------------------------------------------------------
-# get_report_dataframe — invalid API response
-# ---------------------------------------------------------------------------
+# -------------------------
+
 
 def test_get_report_dataframe_raises_on_invalid_report_type(fb, base_params, mocker):
     """If get_report returns a non-list, ValueError is raised."""
@@ -60,6 +74,7 @@ def test_get_report_dataframe_raises_on_none_report(fb, base_params, mocker):
 # ---------------------------------------------------------------------------
 # get_report_dataframe — actions expansion
 # ---------------------------------------------------------------------------
+
 
 def test_get_report_dataframe_expands_actions(fb, base_params, mocker):
     """Rows with an 'actions' list get flattened into _action_* columns."""
@@ -136,9 +151,17 @@ def test_get_report_dataframe_no_duplicate_action_columns(fb, base_params, mocke
 # get_report_dataframe — multiple accounts
 # ---------------------------------------------------------------------------
 
+
 def test_get_report_dataframe_multiple_accounts_concatenates(fb, base_params, mocker):
     """Passing a list of accounts concatenates results into a single DataFrame."""
-    raw = [{"impressions": "100", "date_start": "2024-01-01", "date_stop": "2024-01-01", "account_id": "111"}]
+    raw = [
+        {
+            "impressions": "100",
+            "date_start": "2024-01-01",
+            "date_stop": "2024-01-01",
+            "account_id": "111",
+        }
+    ]
     mocker.patch.object(fb, "get_report", return_value=raw)
 
     df = fb.get_report_dataframe(base_params, id_account=["111", "222"])
@@ -150,6 +173,7 @@ def test_get_report_dataframe_multiple_accounts_concatenates(fb, base_params, mo
 # ---------------------------------------------------------------------------
 # get_report — async job polling
 # ---------------------------------------------------------------------------
+
 
 def _make_async_job(status_sequence, records=None):
     """Build a mock async job that cycles through status_sequence on api_get()."""
@@ -254,6 +278,7 @@ def test_get_report_raises_on_critical_facebook_error(fb, mocker):
 # _split_text
 # ---------------------------------------------------------------------------
 
+
 def test_split_text_returns_value_for_matching_action(fb):
     actions = [{"action_type": "purchase", "value": "5"}]
     assert fb._split_text(actions, "purchase") == "5"
@@ -274,14 +299,20 @@ def test_split_text_returns_zero_for_non_list(fb):
 # _unique_actions
 # ---------------------------------------------------------------------------
 
+
 def test_unique_actions_extracts_action_types(fb):
-    df = pd.DataFrame({
-        "spend": ["10", "20"],
-        "actions": [
-            [{"action_type": "purchase", "value": "1"}],
-            [{"action_type": "purchase", "value": "2"}, {"action_type": "link_click", "value": "8"}],
-        ],
-    })
+    df = pd.DataFrame(
+        {
+            "spend": ["10", "20"],
+            "actions": [
+                [{"action_type": "purchase", "value": "1"}],
+                [
+                    {"action_type": "purchase", "value": "2"},
+                    {"action_type": "link_click", "value": "8"},
+                ],
+            ],
+        }
+    )
     result = fb._unique_actions(df)
     assert "actions" in result
     assert result["actions"] == {"purchase", "link_click"}
