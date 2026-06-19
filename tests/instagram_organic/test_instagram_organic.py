@@ -1,9 +1,8 @@
-import pytest
-import requests
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pandas as pd
-
+import pytest
+import requests
 
 # ---------------------------------------------------------------------------
 # _get — HTTP layer
@@ -137,7 +136,9 @@ def test_get_media_filters_by_product_type(ig, mocker):
 
 def test_get_media_returns_empty_when_no_match(ig, mocker):
     """Returns empty list when no media matches the requested type."""
-    mocker.patch.object(ig, "_paginate", return_value=[{"id": "1", "media_product_type": "REELS"}])
+    mocker.patch.object(
+        ig, "_paginate", return_value=[{"id": "1", "media_product_type": "REELS"}]
+    )
 
     result = ig._get_media("acc123", "2024-01-01", "2024-01-31", "FEED")
     assert result == []
@@ -201,9 +202,7 @@ def test_get_media_insights_returns_flat_dict(ig, mocker):
         ig,
         "_get",
         return_value={
-            "data": [
-                {"name": "likes", "period": "lifetime", "values": [{"value": 42}]}
-            ]
+            "data": [{"name": "likes", "period": "lifetime", "values": [{"value": 42}]}]
         },
     )
     result = ig._get_media_insights("media123", ["likes"])
@@ -320,7 +319,9 @@ def test_get_reels_calls_get_media_with_reels_type(ig, feed_metrics, mocker):
 
     ig.get_reels("acc123", feed_metrics, since="2024-01-01", until="2024-01-31")
 
-    mock_get_media.assert_called_once_with("acc123", "2024-01-01", "2024-01-31", "REELS")
+    mock_get_media.assert_called_once_with(
+        "acc123", "2024-01-01", "2024-01-31", "REELS"
+    )
 
 
 def test_get_stories_calls_get_stories(ig, story_metrics, mocker):

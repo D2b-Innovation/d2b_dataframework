@@ -6,7 +6,7 @@ import pandas as pd
 import requests
 
 
-class Instagram_Organic:
+class InstagramOrganic:
     """Abstraction layer for the Instagram Graph API Media Insights (organic).
 
     Handles authentication, pagination, media retrieval, and media-level
