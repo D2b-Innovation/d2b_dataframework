@@ -7,7 +7,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 
-class YoutubePublic:
+class YouTubePublic:
     """YouTube Data API v3 connector for public data.
 
     Authenticates exclusively via an API key — no OAuth, no service account.
@@ -40,7 +40,7 @@ class YoutubePublic:
             "youtube", "v3", developerKey=api_key, cache_discovery=False
         )
         self.verbose.log(
-            "--- EXECUTING YoutubePublic Class v1.0 "
+            "--- EXECUTING YouTubePublic Class v1.0 "
             f"- Initialized at {datetime.now(UTC).isoformat()} ---"
         )
 
@@ -55,7 +55,7 @@ class YoutubePublic:
             An object with ``.log()`` and ``.critical()`` methods backed by
             Python's standard ``logging`` module.
         """
-        logger = logging.getLogger("YoutubePublic")
+        logger = logging.getLogger("YouTubePublic")
         if not logger.handlers:
             logging.basicConfig(level=logging.INFO)
 
@@ -161,7 +161,7 @@ class YoutubePublic:
             raise ValueError(
                 "Must specify the channel with id='CHANNEL_ID' or "
                 "forUsername='USERNAME'. The mine=True parameter requires "
-                "OAuth authentication and is not supported by YoutubePublic."
+                "OAuth authentication and is not supported by YouTubePublic."
             )
 
         try:
