@@ -8,6 +8,6 @@ def yt(mocker):
         "d2b_data.YouTubeOrganic.build",
         return_value=MagicMock(),
     )
-    from d2b_data.YouTubeOrganic import YoutubePublic
+    from d2b_data.YouTubeOrganic import YouTubePublic
 
-    return YoutubePublic(api_key="fake_api_key")
+    return YouTubePublic(api_key="fake_api_key")

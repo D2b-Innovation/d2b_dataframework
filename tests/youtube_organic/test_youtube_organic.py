@@ -20,10 +20,10 @@ def test_instantiation_creates_service(yt):
 
 def test_instantiation_uses_custom_logger(mocker):
     mocker.patch("d2b_data.YouTubeOrganic.build", return_value=MagicMock())
-    from d2b_data.YouTubeOrganic import YoutubePublic
+    from d2b_data.YouTubeOrganic import YouTubePublic
 
     custom_logger = MagicMock()
-    yt = YoutubePublic(api_key="key", verbose_logger=custom_logger)
+    yt = YouTubePublic(api_key="key", verbose_logger=custom_logger)
     assert yt.verbose is custom_logger
 
 
