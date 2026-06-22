@@ -1,11 +1,11 @@
 import pytest
 
-from d2b_data.InstagramOrganic import Instagram_Organic
+from d2b_data.InstagramOrganic import InstagramOrganic
 
 
 @pytest.fixture
 def ig():
-    return Instagram_Organic(access_token="fake_token")
+    return InstagramOrganic(access_token="fake_token")
 
 
 @pytest.fixture
