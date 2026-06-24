@@ -26,7 +26,7 @@ def test_validate_connection_is_valid(tiktok, mocker):
     """Validates that the connection returns a valid response"""
 
     mocker.patch(
-        "d2b_data.Tiktok_marketing.TikTokMarketing._token_test_connection",
+        "d2b_data.tiktok_marketing.TikTokMarketing._token_test_connection",
         return_value=True,
     )
 
@@ -37,7 +37,7 @@ def test_validate_connection_is_not_valid(tiktok, mocker):
     """When token is loaded but connection fails, should return False"""
 
     mocker.patch(
-        "d2b_data.Tiktok_marketing.TikTokMarketing._token_test_connection",
+        "d2b_data.tiktok_marketing.TikTokMarketing._token_test_connection",
         return_value=False,
     )
 
@@ -89,7 +89,7 @@ def test_get_report_raw_success(tiktok, mocker):
     fake_response.status_code = 200
     fake_response.json.return_value = {"code": 0, "data": {"list": []}}
 
-    mocker.patch("d2b_data.Tiktok_marketing.requests.get", return_value=fake_response)
+    mocker.patch("d2b_data.tiktok_marketing.requests.get", return_value=fake_response)
     result = tiktok._get_report_raw(params={})
 
     assert result["code"] == 0
@@ -101,7 +101,7 @@ def test_get_report_raw_429_backoff(tiktok, mocker):
     fake_response = MagicMock()
     fake_response.status_code = 429
     mocker.patch(
-        "d2b_data.Tiktok_marketing.requests.get",
+        "d2b_data.tiktok_marketing.requests.get",
         side_effect=[
             fake_response,
             fake_response,
@@ -123,7 +123,7 @@ def test_get_report_error_code_tiktok(tiktok, mocker):
     fake_response = MagicMock()
     fake_response.status_code = 200
     fake_response.json.return_value = {"code": 40001, "message": "Some error"}
-    mocker.patch("d2b_data.Tiktok_marketing.requests.get", return_value=fake_response)
+    mocker.patch("d2b_data.tiktok_marketing.requests.get", return_value=fake_response)
 
     result = tiktok._get_report_raw(params={})
 
@@ -133,7 +133,7 @@ def test_get_report_error_code_tiktok(tiktok, mocker):
 def test_get_report_raw_exception(tiktok, mocker):
     """Tests the correct implementation on error handling during extraction"""
     mocker.patch(
-        "d2b_data.Tiktok_marketing.requests.get", side_effect=Exception("Error Message")
+        "d2b_data.tiktok_marketing.requests.get", side_effect=Exception("Error Message")
     )
 
     result = tiktok._get_report_raw(params={})

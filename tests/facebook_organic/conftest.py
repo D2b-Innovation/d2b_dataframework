@@ -1,6 +1,6 @@
 import pytest
 
-from d2b_data.FacebookOrganic import FacebookOrganic
+from d2b_data.facebook_organic import FacebookOrganic
 
 
 @pytest.fixture

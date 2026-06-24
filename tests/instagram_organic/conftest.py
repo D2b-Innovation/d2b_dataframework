@@ -1,6 +1,6 @@
 import pytest
 
-from d2b_data.InstagramOrganic import InstagramOrganic
+from d2b_data.instagram_organic import InstagramOrganic
 
 
 @pytest.fixture

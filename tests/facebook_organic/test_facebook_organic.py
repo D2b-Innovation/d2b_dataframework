@@ -21,7 +21,7 @@ def test_instantiation_without_page_id(fb):
 
 def test_same_instance_works_for_multiple_page_ids(metrics, mocker):
     """One instance can serve multiple pages without re-instantiating."""
-    from d2b_data.FacebookOrganic import FacebookOrganic
+    from d2b_data.facebook_organic import FacebookOrganic
 
     fb = FacebookOrganic(access_token="fake_token")
     mocker.patch.object(fb, "get_posts", return_value=[])
