@@ -56,6 +56,17 @@ class WorkflowLogger:
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
 
+    def set_workflow_name(self, workflow_name: str) -> None:
+        """
+        Setter function used to change the name of the workflow during execution
+        Args: A string with the workflow name.
+
+        Return:
+            None.
+        """
+        self.workflow_name = workflow_name
+        self.logger.name = workflow_name
+
     def debug(self, message: str) -> None:
         if self.active:
             self.logger.debug(message)
